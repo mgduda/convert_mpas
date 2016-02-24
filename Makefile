@@ -1,7 +1,7 @@
 FC = gfortran
 FFLAGS = -O2 -ffree-form
 FCINCLUDES = -I${NETCDF}/include
-FCLIBS = -L${NETCDF}/lib -lnetcdf
+FCLIBS = -L${NETCDF}/lib -lnetcdff -lnetcdf
 
 .SUFFIXES: .F .o
 
