@@ -1,12 +1,14 @@
 program convert_mpas
 
     use scan_input
+    use mpas_mesh
 
     implicit none
 
    
     integer :: stat
     character (len=1024) :: filename
+    type (mpas_mesh_type) :: source_mesh
     type (input_handle_type) :: handle
     type (input_field_type) :: field
 
@@ -19,6 +21,11 @@ program convert_mpas
     end if
 
     call get_command_argument(1, filename)
+
+    if (mpas_mesh_setup(filename, source_mesh) /= 0) then
+        write(0,*) 'Error: Problems setting up MPAS mesh from file '//trim(filename)
+        stop 2
+    end if
 
     stat = scan_input_open(filename, handle)
 
@@ -37,5 +44,9 @@ write(0,*) 'Checking for cellsOnCell'
     stat = scan_input_free_field(field)
 
     stat = scan_input_close(handle)
+
+    stat = mpas_mesh_free(source_mesh)
+
+    stop
 
 end program convert_mpas

@@ -7,12 +7,15 @@ FCLIBS = -L${NETCDF}/lib -lnetcdff -lnetcdf
 
 OBJS = \
 	scan_input.o \
+	mpas_mesh.o \
 	convert_mpas.o
 
 all: $(OBJS)
-	$(FC) -o convert_mpas convert_mpas.o scan_input.o $(FCLIBS)
+	$(FC) -o convert_mpas $(OBJS) $(FCLIBS)
 
-convert_mpas.o: scan_input.o
+convert_mpas.o: scan_input.o mpas_mesh.o
+
+mpas_mesh.o: scan_input.o
 
 scan_input.o:
 
