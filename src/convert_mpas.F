@@ -10,6 +10,7 @@ program convert_mpas
 
    
     integer :: stat
+    integer :: idim
     character (len=1024) :: filename
     type (mpas_mesh_type) :: source_mesh
     type (target_mesh_type) :: destination_mesh
@@ -49,6 +50,11 @@ program convert_mpas
     do while (scan_input_next_field(handle, field) == 0) 
        write(0,*) 'Field name = ', trim(field % name)
        write(0,*) '   ', field % isTimeDependent
+       write(0,*) '   can remap? ', can_remap_field(field)
+       write(0,*) '   ndims=', field % ndims
+       do idim=1,field % ndims
+           write(0,*) '         ', trim(field % dimnames(idim))
+       end do
        stat = scan_input_free_field(field)
     end do
 

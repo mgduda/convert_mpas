@@ -69,6 +69,45 @@ module remapper
     end function remap_info_free
 
 
+    logical function can_remap_field(field)
+
+        implicit none
+
+        type (input_field_type), intent(in) :: field
+
+        integer :: decompDim
+
+        can_remap_field = .true.
+
+        if (field % xtype /= FIELD_TYPE_INTEGER .and. &
+            field % xtype /= FIELD_TYPE_REAL .and. &
+            field % xtype /= FIELD_TYPE_DOUBLE) then
+            can_remap_field = .false.
+            return
+        end if
+
+        if (field % ndims == 0 .or. &
+            (field % ndims == 1 .and. field % isTimeDependent)) then
+            can_remap_field = .false.
+            return
+        end if
+
+        decompDim = field % ndims
+        if (field % isTimeDependent) then
+            decompDim = decompDim - 1
+        end if
+
+        if (trim(field % dimnames(decompDim)) /= 'nCells' .and. &
+            trim(field % dimnames(decompDim)) /= 'nVertices' .and. &
+            trim(field % dimnames(decompDim)) /= 'nEdges') then
+
+            can_remap_field = .false.
+            return
+        end if
+
+    end function can_remap_field
+
+
     integer function remap_field(remap_info, src_field, dst_field) result(stat)
 
         implicit none
