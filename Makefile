@@ -1,5 +1,5 @@
 FC = gfortran
-FFLAGS = -O2 -ffree-form
+FFLAGS = -O2 -ffree-form -Wall
 FCINCLUDES = -I${NETCDF}/include
 FCLIBS = -L${NETCDF}/lib -lnetcdff -lnetcdf
 
