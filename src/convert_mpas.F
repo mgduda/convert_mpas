@@ -67,28 +67,22 @@ write(0,*) 'eh? ', size(field % array1r)
         end if
     end if
 write(0,*) 'Freeing field'
-    stat = scan_input_free_field(field)
 
     stat = scan_input_close(handle)
 
+
     stat = file_output_open('blah.nc', output_handle)
-    target_field % name = 'foo'
-    target_field % xtype = FIELD_TYPE_DOUBLE
-    target_field % ndims = 1
-    target_field % isTimeDependent = .true.
-    allocate(target_field % dimnames(1))
-    allocate(target_field % dimlens(1))
-    target_field % dimnames(1) = 'nLats'
-    target_field % dimlens(1) = 180
-    allocate(target_field % array1d(180))
-    target_field % array1d(:) = 42.14159265359
+
+    stat = remap_field(remap_info, field, target_field)
     stat = file_output_register_field(output_handle, target_field)
+
     stat = file_output_write_field(output_handle, target_field)
 
+
     stat = mpas_mesh_free(source_mesh)
-
     stat = target_mesh_free(destination_mesh)
-
+    stat = scan_input_free_field(field)
+    stat = free_target_field(target_field)
     stat = remap_info_free(remap_info)
 
     stat = file_output_close(output_handle)
