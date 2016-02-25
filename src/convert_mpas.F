@@ -4,6 +4,7 @@ program convert_mpas
     use mpas_mesh
     use target_mesh
     use remapper
+    use file_output
 
     implicit none
 
@@ -15,6 +16,8 @@ program convert_mpas
     type (input_handle_type) :: handle
     type (input_field_type) :: field
     type (remap_info_type) :: remap_info
+    type (output_handle_type) :: output_handle
+    type (target_field_type) :: target_field
 
 
     if (command_argument_count() < 1) then
@@ -68,11 +71,17 @@ write(0,*) 'Freeing field'
 
     stat = scan_input_close(handle)
 
+    stat = file_output_open('blah.nc', output_handle)
+    stat = file_output_register_field(output_handle, target_field)
+    stat = file_output_write_field(output_handle, target_field)
+
     stat = mpas_mesh_free(source_mesh)
 
     stat = target_mesh_free(destination_mesh)
 
     stat = remap_info_free(remap_info)
+
+    stat = file_output_close(output_handle)
 
     stop
 

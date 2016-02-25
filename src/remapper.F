@@ -9,6 +9,13 @@ module remapper
         type (target_mesh_type), pointer :: dst_mesh
     end type remap_info_type
 
+    type target_field_type
+        character (len=64) :: name
+        integer :: ndims = -1
+        integer :: xtype = -1
+        logical :: isTimeDependent = .false.
+    end type target_field_type
+
 
     contains
 
