@@ -19,12 +19,30 @@ module scan_input
         character (len=64), dimension(:), pointer :: dimnames
         integer, dimension(:), pointer :: dimlens
         integer, dimension(:), pointer :: dimids
+        type (input_handle_type), pointer :: file_handle
+
+        !  Members to store field data
+        real :: array0r
+        real, dimension(:), pointer :: array1r => null()
+        real, dimension(:,:), pointer :: array2r => null()
+        real, dimension(:,:,:), pointer :: array3r => null()
+        real, dimension(:,:,:,:), pointer :: array4r => null()
+        double precision :: array0d
+        double precision, dimension(:), pointer :: array1d => null()
+        double precision, dimension(:,:), pointer :: array2d => null()
+        double precision, dimension(:,:,:), pointer :: array3d => null()
+        double precision, dimension(:,:,:,:), pointer :: array4d => null()
+        integer :: array0i
+        integer, dimension(:), pointer :: array1i => null()
+        integer, dimension(:,:), pointer :: array2i => null()
+        integer, dimension(:,:,:), pointer :: array3i => null()
     end type input_field_type
 
-    integer, parameter :: FIELD_TYPE_REAL      = 1, &
-                          FIELD_TYPE_DOUBLE    = 2, &
-                          FIELD_TYPE_INTEGER   = 3, &
-                          FIELD_TYPE_CHARACTER = 4
+    integer, parameter :: FIELD_TYPE_UNSUPPORTED = -1, &
+                          FIELD_TYPE_REAL        =  1, &
+                          FIELD_TYPE_DOUBLE      =  2, &
+                          FIELD_TYPE_INTEGER     =  3, &
+                          FIELD_TYPE_CHARACTER   =  4
 
 
     contains
@@ -97,7 +115,7 @@ module scan_input
 
         implicit none
 
-        type (input_handle_type), intent(inout) :: handle
+        type (input_handle_type), intent(inout), target :: handle
         type (input_field_type), intent(out) :: field
 
         integer :: idim
@@ -128,6 +146,8 @@ module scan_input
             field % xtype = FIELD_TYPE_INTEGER
         else if (field % xtype == NF90_CHAR) then
             field % xtype = FIELD_TYPE_CHARACTER
+        else
+            field % xtype = FIELD_TYPE_UNSUPPORTED
         end if
 
         allocate(field % dimids(field % ndims))
@@ -152,6 +172,8 @@ module scan_input
             end if
         end do
 
+        field % file_handle => handle
+
         handle % current_var = handle % current_var + 1
 
     end function scan_input_next_field
@@ -161,7 +183,7 @@ module scan_input
 
         implicit none
 
-        type (input_handle_type), intent(inout) :: handle
+        type (input_handle_type), intent(inout), target :: handle
         character (len=*), intent(in) :: fieldname
         type (input_field_type), intent(out) :: field
 
@@ -184,6 +206,18 @@ module scan_input
             return
         end if
 
+        if (field % xtype == NF90_FLOAT) then
+            field % xtype = FIELD_TYPE_REAL
+        else if (field % xtype == NF90_DOUBLE) then
+            field % xtype = FIELD_TYPE_DOUBLE
+        else if (field % xtype == NF90_INT) then
+            field % xtype = FIELD_TYPE_INTEGER
+        else if (field % xtype == NF90_CHAR) then
+            field % xtype = FIELD_TYPE_CHARACTER
+        else
+            field % xtype = FIELD_TYPE_UNSUPPORTED
+        end if
+
         allocate(field % dimids(field % ndims))
 
         stat = nf90_inquire_variable(handle % ncid, field % varid, &
@@ -206,7 +240,255 @@ module scan_input
             end if
         end do
 
+        field % file_handle => handle
+
     end function scan_input_for_field
+
+
+    integer function scan_input_read_field(field, frame) result(stat)
+
+        implicit none
+
+        type (input_field_type), intent(inout) :: field
+        integer, intent(in), optional :: frame
+
+        integer :: local_frame
+        integer, dimension(5) :: start, count
+        real, dimension(1) :: temp1r
+        double precision, dimension(1) :: temp1d
+        integer, dimension(1) :: temp1i
+
+
+        stat = 0
+
+        local_frame = 1
+        if (present(frame)) then
+            local_frame = frame
+        end if
+
+        if (field % xtype == FIELD_TYPE_REAL) then
+            if (field % ndims == 0 .or. (field % ndims == 1 .and. field % isTimeDependent)) then
+                if (field % isTimeDependent) then
+                    start(1) = local_frame
+                    count(1) = 1
+                    stat = nf90_get_var(field % file_handle % ncid, field % varid, temp1r, &
+                                        start=start(1:1), count=count(1:1))
+                    field % array0r = temp1r(1)
+                else
+                    stat = nf90_get_var(field % file_handle % ncid, field % varid, field % array0r)
+                end if
+            else if (field % ndims == 1 .or. (field % ndims == 2 .and. field % isTimeDependent)) then
+                if (field % isTimeDependent) then
+                    start(1) = 1
+                    count(1) = field % dimlens(1)
+                    start(2) = local_frame
+                    count(2) = 1
+                    allocate(field % array1r(count(1)))
+                    stat = nf90_get_var(field % file_handle % ncid, field % varid, field % array1r, &
+                                        start=start(1:2), count=count(1:2))
+                else
+                    allocate(field % array1r(field%dimlens(1)))
+                    stat = nf90_get_var(field % file_handle % ncid, field % varid, field % array1r)
+                end if
+            else if (field % ndims == 2 .or. (field % ndims == 3 .and. field % isTimeDependent)) then
+                if (field % isTimeDependent) then
+                    start(1) = 1
+                    count(1) = field % dimlens(1)
+                    start(2) = 1
+                    count(2) = field % dimlens(2)
+                    start(3) = local_frame
+                    count(3) = 1
+                    allocate(field % array2r(count(1),count(2)))
+                    stat = nf90_get_var(field % file_handle % ncid, field % varid, field % array2r, &
+                                        start=start(1:3), count=count(1:3))
+                else
+                    allocate(field % array2r(field%dimlens(1),field%dimlens(2)))
+                    stat = nf90_get_var(field % file_handle % ncid, field % varid, field % array2r)
+                end if
+            else if (field % ndims == 3 .or. (field % ndims == 4 .and. field % isTimeDependent)) then
+                if (field % isTimeDependent) then
+                    start(1) = 1
+                    count(1) = field % dimlens(1)
+                    start(2) = 1
+                    count(2) = field % dimlens(2)
+                    start(3) = 1
+                    count(3) = field % dimlens(3)
+                    start(4) = local_frame
+                    count(4) = 1
+                    allocate(field % array3r(count(1),count(2),count(3)))
+                    stat = nf90_get_var(field % file_handle % ncid, field % varid, field % array3r, &
+                                        start=start(1:4), count=count(1:4))
+                else
+                    allocate(field % array3r(field%dimlens(1),field%dimlens(2),field%dimlens(3)))
+                    stat = nf90_get_var(field % file_handle % ncid, field % varid, field % array3r)
+                end if
+            else if (field % ndims == 4 .or. (field % ndims == 5 .and. field % isTimeDependent)) then
+                if (field % isTimeDependent) then
+                    start(1) = 1
+                    count(1) = field % dimlens(1)
+                    start(2) = 1
+                    count(2) = field % dimlens(2)
+                    start(3) = 1
+                    count(3) = field % dimlens(3)
+                    start(4) = 1
+                    count(4) = field % dimlens(4)
+                    start(5) = local_frame
+                    count(5) = 1
+                    allocate(field % array4r(count(1),count(2),count(3),count(4)))
+                    stat = nf90_get_var(field % file_handle % ncid, field % varid, field % array4r, &
+                                        start=start(1:5), count=count(1:5))
+                else
+                    allocate(field % array4r(field%dimlens(1),field%dimlens(2),field%dimlens(3),field%dimlens(4)))
+                    stat = nf90_get_var(field % file_handle % ncid, field % varid, field % array4r)
+                end if
+            end if
+        else if (field % xtype == FIELD_TYPE_DOUBLE) then
+            if (field % ndims == 0 .or. (field % ndims == 1 .and. field % isTimeDependent)) then
+                if (field % isTimeDependent) then
+                    start(1) = local_frame
+                    count(1) = 1
+                    stat = nf90_get_var(field % file_handle % ncid, field % varid, temp1d, &
+                                        start=start(1:1), count=count(1:1))
+                    field % array0d = temp1d(1)
+                else
+                    stat = nf90_get_var(field % file_handle % ncid, field % varid, field % array0d)
+                end if
+            else if (field % ndims == 1 .or. (field % ndims == 2 .and. field % isTimeDependent)) then
+                if (field % isTimeDependent) then
+                    start(1) = 1
+                    count(1) = field % dimlens(1)
+                    start(2) = local_frame
+                    count(2) = 1
+                    allocate(field % array1d(count(1)))
+                    stat = nf90_get_var(field % file_handle % ncid, field % varid, field % array1d, &
+                                        start=start(1:2), count=count(1:2))
+                else
+                    allocate(field % array1d(field%dimlens(1)))
+                    stat = nf90_get_var(field % file_handle % ncid, field % varid, field % array1d)
+                end if
+            else if (field % ndims == 2 .or. (field % ndims == 3 .and. field % isTimeDependent)) then
+                if (field % isTimeDependent) then
+                    start(1) = 1
+                    count(1) = field % dimlens(1)
+                    start(2) = 1
+                    count(2) = field % dimlens(2)
+                    start(3) = local_frame
+                    count(3) = 1
+                    allocate(field % array2d(count(1),count(2)))
+                    stat = nf90_get_var(field % file_handle % ncid, field % varid, field % array2d, &
+                                        start=start(1:3), count=count(1:3))
+                else
+                    allocate(field % array2d(field%dimlens(1),field%dimlens(2)))
+                    stat = nf90_get_var(field % file_handle % ncid, field % varid, field % array2d)
+                end if
+            else if (field % ndims == 3 .or. (field % ndims == 4 .and. field % isTimeDependent)) then
+                if (field % isTimeDependent) then
+                    start(1) = 1
+                    count(1) = field % dimlens(1)
+                    start(2) = 1
+                    count(2) = field % dimlens(2)
+                    start(3) = 1
+                    count(3) = field % dimlens(3)
+                    start(4) = local_frame
+                    count(4) = 1
+                    allocate(field % array3d(count(1),count(2),count(3)))
+                    stat = nf90_get_var(field % file_handle % ncid, field % varid, field % array3d, &
+                                        start=start(1:4), count=count(1:4))
+                else
+                    allocate(field % array3d(field%dimlens(1),field%dimlens(2),field%dimlens(3)))
+                    stat = nf90_get_var(field % file_handle % ncid, field % varid, field % array3d)
+                end if
+            else if (field % ndims == 4 .or. (field % ndims == 5 .and. field % isTimeDependent)) then
+                if (field % isTimeDependent) then
+                    start(1) = 1
+                    count(1) = field % dimlens(1)
+                    start(2) = 1
+                    count(2) = field % dimlens(2)
+                    start(3) = 1
+                    count(3) = field % dimlens(3)
+                    start(4) = 1
+                    count(4) = field % dimlens(4)
+                    start(5) = local_frame
+                    count(5) = 1
+                    allocate(field % array4d(count(1),count(2),count(3),count(4)))
+                    stat = nf90_get_var(field % file_handle % ncid, field % varid, field % array4d, &
+                                        start=start(1:5), count=count(1:5))
+                else
+                    allocate(field % array4d(field%dimlens(1),field%dimlens(2),field%dimlens(3),field%dimlens(4)))
+                    stat = nf90_get_var(field % file_handle % ncid, field % varid, field % array4d)
+                end if
+            end if
+
+        else if (field % xtype == FIELD_TYPE_INTEGER) then
+            if (field % ndims == 0 .or. (field % ndims == 1 .and. field % isTimeDependent)) then
+                if (field % isTimeDependent) then
+                    start(1) = local_frame
+                    count(1) = 1
+                    stat = nf90_get_var(field % file_handle % ncid, field % varid, temp1i, &
+                                        start=start(1:1), count=count(1:1))
+                    field % array0i = temp1i(1)
+                else
+                    stat = nf90_get_var(field % file_handle % ncid, field % varid, field % array0i)
+                end if
+            else if (field % ndims == 1 .or. (field % ndims == 2 .and. field % isTimeDependent)) then
+                if (field % isTimeDependent) then
+                    start(1) = 1
+                    count(1) = field % dimlens(1)
+                    start(2) = local_frame
+                    count(2) = 1
+                    allocate(field % array1i(count(1)))
+                    stat = nf90_get_var(field % file_handle % ncid, field % varid, field % array1i, &
+                                        start=start(1:2), count=count(1:2))
+                else
+                    allocate(field % array1i(field%dimlens(1)))
+                    stat = nf90_get_var(field % file_handle % ncid, field % varid, field % array1i)
+                end if
+            else if (field % ndims == 2 .or. (field % ndims == 3 .and. field % isTimeDependent)) then
+                if (field % isTimeDependent) then
+                    start(1) = 1
+                    count(1) = field % dimlens(1)
+                    start(2) = 1
+                    count(2) = field % dimlens(2)
+                    start(3) = local_frame
+                    count(3) = 1
+                    allocate(field % array2i(count(1),count(2)))
+                    stat = nf90_get_var(field % file_handle % ncid, field % varid, field % array2i, &
+                                        start=start(1:3), count=count(1:3))
+                else
+                    allocate(field % array2i(field%dimlens(1),field%dimlens(2)))
+                    stat = nf90_get_var(field % file_handle % ncid, field % varid, field % array2i)
+                end if
+            else if (field % ndims == 3 .or. (field % ndims == 4 .and. field % isTimeDependent)) then
+                if (field % isTimeDependent) then
+                    start(1) = 1
+                    count(1) = field % dimlens(1)
+                    start(2) = 1
+                    count(2) = field % dimlens(2)
+                    start(3) = 1
+                    count(3) = field % dimlens(3)
+                    start(4) = local_frame
+                    count(4) = 1
+                    allocate(field % array3i(count(1),count(2),count(3)))
+                    stat = nf90_get_var(field % file_handle % ncid, field % varid, field % array3i, &
+                                        start=start(1:4), count=count(1:4))
+                else
+                    allocate(field % array3i(field%dimlens(1),field%dimlens(2),field%dimlens(3)))
+                    stat = nf90_get_var(field % file_handle % ncid, field % varid, field % array3i)
+                end if
+            end if
+
+        else if (field % xtype == FIELD_TYPE_CHARACTER) then
+            write(0,*) ' '
+            write(0,*) 'Processing of character fields is not supported; skipping read of field '//trim(field % name)
+            write(0,*) ' '
+
+        else
+            write(0,*) ' '
+            write(0,*) 'Unsupported type; skipping read of field '//trim(field % name)
+            write(0,*) ' '
+        end if
+
+    end function scan_input_read_field
 
 
     integer function scan_input_free_field(field) result(stat)
@@ -227,6 +509,44 @@ module scan_input
         if (associated(field % dimnames)) then
             deallocate(field % dimnames)
         end if
+
+        if (associated(field % array1r)) then
+            deallocate(field % array1r)
+        end if
+        if (associated(field % array2r)) then
+            deallocate(field % array2r)
+        end if
+        if (associated(field % array3r)) then
+            deallocate(field % array3r)
+        end if
+        if (associated(field % array4r)) then
+            deallocate(field % array4r)
+        end if
+
+        if (associated(field % array1d)) then
+            deallocate(field % array1d)
+        end if
+        if (associated(field % array2d)) then
+            deallocate(field % array2d)
+        end if
+        if (associated(field % array3d)) then
+            deallocate(field % array3d)
+        end if
+        if (associated(field % array4d)) then
+            deallocate(field % array4d)
+        end if
+
+        if (associated(field % array1i)) then
+            deallocate(field % array1i)
+        end if
+        if (associated(field % array2i)) then
+            deallocate(field % array2i)
+        end if
+        if (associated(field % array3i)) then
+            deallocate(field % array3i)
+        end if
+
+        nullify(field % file_handle)
 
     end function scan_input_free_field
 

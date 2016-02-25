@@ -35,12 +35,21 @@ program convert_mpas
        stat = scan_input_free_field(field)
     end do
 
-write(0,*) 'Checking for cellsOnCell'
-    if (scan_input_for_field(handle, 'cellsOnCell', field) /= 0) then
-        write(0,*) 'Scan for cellsOnCell failed...'
+write(0,*) 'Checking for xCell'
+    if (scan_input_for_field(handle, 'xCell', field) /= 0) then
+        write(0,*) 'Scan for xCell failed...'
     else
         write(0,*) 'success: '//trim(field % name)
+        stat = scan_input_read_field(field)
+        if (stat /= 0) then
+            write(0,*) 'Error while reading xCell'
+        else
+write(0,*) 'eh? ', size(field % array1r)
+            write(0,*) field % array1r(1:10)
+            write(0,*) field % array1r(field % dimlens(1)-10:field % dimlens(1))
+        end if
     end if
+write(0,*) 'Freeing field'
     stat = scan_input_free_field(field)
 
     stat = scan_input_close(handle)
