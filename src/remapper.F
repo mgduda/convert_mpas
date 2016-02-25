@@ -8,6 +8,8 @@ module remapper
         integer :: method = -1
         type (mpas_mesh_type), pointer :: src_mesh
         type (target_mesh_type), pointer :: dst_mesh
+        integer, dimension(:,:), pointer :: nearestCell
+        integer, dimension(:,:), pointer :: nearestVertex
     end type remap_info_type
 
     type target_field_type
@@ -34,6 +36,8 @@ module remapper
         integer, dimension(:,:), pointer :: array2i => null()
         integer, dimension(:,:,:), pointer :: array3i => null()
     end type target_field_type
+
+    private :: nearest_cell, nearest_vertex, sphere_distance
 
 
     contains
@@ -65,6 +69,13 @@ module remapper
         stat = 0
 
         remap_info % method = -1
+
+        if (associated(remap_info % nearestCell)) then
+            deallocate(remap_info % nearestCell)
+        end if
+        if (associated(remap_info % nearestVertex)) then
+            deallocate(remap_info % nearestVertex)
+        end if
 
     end function remap_info_free
 
@@ -185,5 +196,133 @@ module remapper
         end if
 
     end function free_target_field
+
+
+    integer function nearest_cell(target_lat, target_lon, start_cell, nCells, maxEdges, &
+                                  nEdgesOnCell, cellsOnCell, latCell, lonCell)
+
+        implicit none
+
+        real, intent(in) :: target_lat, target_lon
+        integer, intent(in) :: start_cell
+        integer, intent(in) :: nCells, maxEdges
+        integer, dimension(nCells), intent(in) :: nEdgesOnCell
+        integer, dimension(maxEdges,nCells), intent(in) :: cellsOnCell
+        real, dimension(nCells), intent(in) :: latCell, lonCell
+
+        integer :: i
+        integer :: iCell
+        integer :: current_cell
+        real :: current_distance, d
+        real :: nearest_distance
+
+        nearest_cell = start_cell
+        current_cell = -1
+
+        do while (nearest_cell /= current_cell)
+            current_cell = nearest_cell
+            current_distance = sphere_distance(latCell(current_cell), lonCell(current_cell), target_lat, &
+                                               target_lon, 1.0)
+            nearest_cell = current_cell
+            nearest_distance = current_distance
+            do i = 1, nEdgesOnCell(current_cell)
+                iCell = cellsOnCell(i,current_cell)
+                if (iCell <= nCells) then
+                    d = sphere_distance(latCell(iCell), lonCell(iCell), target_lat, target_lon, 1.0)
+                    if (d < nearest_distance) then
+                        nearest_cell = iCell
+                        nearest_distance = d
+                    end if
+                end if
+            end do
+        end do
+
+    end function nearest_cell
+
+
+    integer function nearest_vertex( target_lat, target_lon, &
+                                     start_vertex, &
+                                     nCells, nVertices, maxEdges, &
+                                     nEdgesOnCell, verticesOnCell, &
+                                     cellsOnVertex, latCell, lonCell, &
+                                     latVertex, lonVertex )
+
+        implicit none
+
+        real, intent(in) :: target_lat, target_lon
+        integer, intent(in) :: start_vertex
+        integer, intent(in) :: nCells, nVertices, maxEdges
+        integer, dimension(nCells), intent(in) :: nEdgesOnCell
+        integer, dimension(maxEdges,nCells), intent(in) :: verticesOnCell
+        integer, dimension(3,nVertices), intent(in) :: cellsOnVertex
+        real, dimension(nCells), intent(in) :: latCell, lonCell
+        real, dimension(nVertices), intent(in) :: latVertex, lonVertex
+
+
+        integer :: i, cell1, cell2, cell3, iCell
+        integer :: iVtx
+        integer :: current_vertex
+        real :: cell1_dist, cell2_dist, cell3_dist
+        real :: current_distance, d
+        real :: nearest_distance
+
+        nearest_vertex = start_vertex
+        current_vertex = -1
+
+        do while (nearest_vertex /= current_vertex)
+            current_vertex = nearest_vertex
+            current_distance = sphere_distance(latVertex(current_vertex), lonVertex(current_vertex), &
+                                               target_lat,                target_lon,                1.0)
+            nearest_vertex = current_vertex
+            nearest_distance = current_distance
+            cell1 = cellsOnVertex(1,current_vertex)
+            cell2 = cellsOnVertex(2,current_vertex)
+            cell3 = cellsOnVertex(3,current_vertex)
+            cell1_dist = sphere_distance(latCell(cell1), lonCell(cell1), target_lat, target_lon, 1.0)
+            cell2_dist = sphere_distance(latCell(cell2), lonCell(cell2), target_lat, target_lon, 1.0)
+            cell3_dist = sphere_distance(latCell(cell3), lonCell(cell3), target_lat, target_lon, 1.0)
+            if (cell1_dist < cell2_dist) then
+                if (cell1_dist < cell3_dist) then
+                    iCell = cell1
+                else
+                    iCell = cell3
+                end if
+            else
+                if (cell2_dist < cell3_dist) then
+                    iCell = cell2
+                else
+                    iCell = cell3
+                end if
+            end if
+            do i = 1, nEdgesOnCell(iCell)
+                iVtx = verticesOnCell(i,iCell)
+                d = sphere_distance(latVertex(iVtx), lonVertex(iVtx), target_lat, target_lon, 1.0)
+                if (d < nearest_distance) then
+                    nearest_vertex = iVtx
+                    nearest_distance = d
+                end if
+            end do
+        end do
+
+    end function nearest_vertex
+
+
+    real function sphere_distance(lat1, lon1, lat2, lon2, radius)
+    !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+    ! Compute the great-circle distance between (lat1, lon1) and (lat2, lon2) on a
+    !   sphere with given radius.
+    !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+
+        implicit none
+
+        real, intent(in) :: lat1, lon1, lat2, lon2, radius
+
+        real :: arg1
+
+        arg1 = sqrt( sin(0.5*(lat2-lat1))**2 +  &
+                     cos(lat1)*cos(lat2)*sin(0.5*(lon2-lon1))**2 )
+        sphere_distance = 2.*radius*asin(arg1)
+
+    end function sphere_distance
 
 end module remapper
