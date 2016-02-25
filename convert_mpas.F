@@ -3,6 +3,7 @@ program convert_mpas
     use scan_input
     use mpas_mesh
     use target_mesh
+    use remapper
 
     implicit none
 
@@ -13,6 +14,7 @@ program convert_mpas
     type (target_mesh_type) :: destination_mesh
     type (input_handle_type) :: handle
     type (input_field_type) :: field
+    type (remap_info_type) :: remap_info
 
 
     if (command_argument_count() < 1) then
@@ -32,6 +34,11 @@ program convert_mpas
     if (target_mesh_setup(destination_mesh) /= 0) then
         write(0,*) 'Error: Problems setting up target mesh'
         stop 3
+    end if
+
+    if (remap_info_setup(source_mesh, destination_mesh, remap_info) /= 0) then
+        write(0,*) 'Error: Problems setting up remapping'
+        stop 4
     end if
 
     stat = scan_input_open(filename, handle)
@@ -64,6 +71,8 @@ write(0,*) 'Freeing field'
     stat = mpas_mesh_free(source_mesh)
 
     stat = target_mesh_free(destination_mesh)
+
+    stat = remap_info_free(remap_info)
 
     stop
 

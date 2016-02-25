@@ -9,12 +9,15 @@ OBJS = \
 	scan_input.o \
 	mpas_mesh.o \
 	target_mesh.o \
+	remapper.o \
 	convert_mpas.o
 
 all: $(OBJS)
 	$(FC) -o convert_mpas $(OBJS) $(FCLIBS)
 
 convert_mpas.o: scan_input.o mpas_mesh.o target_mesh.o
+
+remapper.o: mpas_mesh.o target_mesh.o
 
 mpas_mesh.o: scan_input.o
 
