@@ -3,29 +3,11 @@ FFLAGS = -O2 -ffree-form -Wall
 FCINCLUDES = -I${NETCDF}/include
 FCLIBS = -L${NETCDF}/lib -lnetcdff -lnetcdf
 
-.SUFFIXES: .F .o
-
-OBJS = \
-	scan_input.o \
-	mpas_mesh.o \
-	target_mesh.o \
-	remapper.o \
-	convert_mpas.o
-
-all: $(OBJS)
-	$(FC) -o convert_mpas $(OBJS) $(FCLIBS)
-
-convert_mpas.o: scan_input.o mpas_mesh.o target_mesh.o
-
-remapper.o: mpas_mesh.o target_mesh.o
-
-mpas_mesh.o: scan_input.o
-
-scan_input.o:
-
+all:
+	( cd src; $(MAKE) FC="$(FC)" FFLAGS="$(FFLAGS)" FCINCLUDES="$(FCINCLUDES)" FCLIBS="$(FCLIBS)" )
+	if [ -e src/convert_mpas ] ; then \
+	   ( cp src/convert_mpas . ) \
+	fi;
 clean:
-	rm -f *.mod *.o convert_mpas
-
-.F.o:
-	rm -f $@ $*.mod
-	$(FC) $(FFLAGS) -c $*.F $(FCINCLUDES)
+	( cd src; $(MAKE) clean )
+	rm -f convert_mpas
