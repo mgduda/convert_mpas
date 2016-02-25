@@ -14,6 +14,24 @@ module remapper
         integer :: ndims = -1
         integer :: xtype = -1
         logical :: isTimeDependent = .false.
+        integer, dimension(:), pointer :: dimlens
+        character (len=64), dimension(:), pointer :: dimnames
+
+        !  Members to store field data
+        real :: array0r
+        real, dimension(:), pointer :: array1r => null()
+        real, dimension(:,:), pointer :: array2r => null()
+        real, dimension(:,:,:), pointer :: array3r => null()
+        real, dimension(:,:,:,:), pointer :: array4r => null()
+        double precision :: array0d
+        double precision, dimension(:), pointer :: array1d => null()
+        double precision, dimension(:,:), pointer :: array2d => null()
+        double precision, dimension(:,:,:), pointer :: array3d => null()
+        double precision, dimension(:,:,:,:), pointer :: array4d => null()
+        integer :: array0i
+        integer, dimension(:), pointer :: array1i => null()
+        integer, dimension(:,:), pointer :: array2i => null()
+        integer, dimension(:,:,:), pointer :: array3i => null()
     end type target_field_type
 
 

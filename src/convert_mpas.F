@@ -72,6 +72,16 @@ write(0,*) 'Freeing field'
     stat = scan_input_close(handle)
 
     stat = file_output_open('blah.nc', output_handle)
+    target_field % name = 'foo'
+    target_field % xtype = FIELD_TYPE_DOUBLE
+    target_field % ndims = 1
+    target_field % isTimeDependent = .true.
+    allocate(target_field % dimnames(1))
+    allocate(target_field % dimlens(1))
+    target_field % dimnames(1) = 'nLats'
+    target_field % dimlens(1) = 180
+    allocate(target_field % array1d(180))
+    target_field % array1d(:) = 42.14159265359
     stat = file_output_register_field(output_handle, target_field)
     stat = file_output_write_field(output_handle, target_field)
 
