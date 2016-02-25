@@ -2,6 +2,7 @@ program convert_mpas
 
     use scan_input
     use mpas_mesh
+    use target_mesh
 
     implicit none
 
@@ -9,6 +10,7 @@ program convert_mpas
     integer :: stat
     character (len=1024) :: filename
     type (mpas_mesh_type) :: source_mesh
+    type (target_mesh_type) :: destination_mesh
     type (input_handle_type) :: handle
     type (input_field_type) :: field
 
@@ -25,6 +27,11 @@ program convert_mpas
     if (mpas_mesh_setup(filename, source_mesh) /= 0) then
         write(0,*) 'Error: Problems setting up MPAS mesh from file '//trim(filename)
         stop 2
+    end if
+
+    if (target_mesh_setup(destination_mesh) /= 0) then
+        write(0,*) 'Error: Problems setting up target mesh'
+        stop 3
     end if
 
     stat = scan_input_open(filename, handle)
@@ -55,6 +62,8 @@ write(0,*) 'Freeing field'
     stat = scan_input_close(handle)
 
     stat = mpas_mesh_free(source_mesh)
+
+    stat = target_mesh_free(destination_mesh)
 
     stop
 
