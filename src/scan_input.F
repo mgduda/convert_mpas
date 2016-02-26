@@ -111,6 +111,20 @@ module scan_input
     end function scan_input_close
 
 
+    integer function scan_input_rewind(handle) result(stat)
+
+        implicit none
+
+        type (input_handle_type), intent(inout) :: handle
+
+
+        stat = 0
+
+        handle % current_var = 1
+
+    end function scan_input_rewind
+
+
     integer function scan_input_next_field(handle, field) result(stat)
 
         implicit none

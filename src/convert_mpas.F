@@ -66,12 +66,7 @@ program convert_mpas
         stat = scan_input_free_field(field)
     end do
 
-    stat = scan_input_close(handle)
-
-write(0,*) '------------------'
-
-    ! rewind would be nice
-    stat = scan_input_open(filename, handle)
+    stat = scan_input_rewind(handle)
 
     do while (scan_input_next_field(handle, field) == 0) 
         if (can_remap_field(field)) then
