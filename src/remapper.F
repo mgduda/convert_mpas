@@ -146,27 +146,20 @@ module remapper
     end function can_remap_field
 
 
-    integer function remap_field(remap_info, src_field, dst_field, frame) result(stat)
+    integer function remap_field(remap_info, src_field, dst_field) result(stat)
 
         implicit none
 
         type (remap_info_type), intent(in) :: remap_info
         type (input_field_type), intent(in) :: src_field
         type (target_field_type), intent(out) :: dst_field
-        integer, intent(in), optional :: frame
 
-        integer :: local_frame
         integer :: decompDim
         integer :: idim
         integer :: iy, ix
         integer, dimension(:,:), pointer :: nearestIndex
 
         stat = 0
-
-        local_frame = 1
-        if (present(frame)) then
-            local_frame = frame
-        end if
 
         decompDim = src_field % ndims
         if (src_field % isTimeDependent) then
@@ -210,54 +203,30 @@ module remapper
             if (dst_field % ndims == 2) then
                 allocate(dst_field % array2r(dst_field % dimlens(1), &
                                              dst_field % dimlens(2)))
-                if (dst_field % isTimeDependent) then
-                    do iy=1,size(nearestIndex, dim=2)
-                    do ix=1,size(nearestIndex, dim=1)
-                        dst_field % array2r(ix,iy) = src_field % array2r(nearestIndex(ix,iy),local_frame)
-                    end do
-                    end do
-                else
-                    do iy=1,size(nearestIndex, dim=2)
-                    do ix=1,size(nearestIndex, dim=1)
-                        dst_field % array2r(ix,iy) = src_field % array1r(nearestIndex(ix,iy))
-                    end do
-                    end do
-                end if
+                do iy=1,size(nearestIndex, dim=2)
+                do ix=1,size(nearestIndex, dim=1)
+                    dst_field % array2r(ix,iy) = src_field % array1r(nearestIndex(ix,iy))
+                end do
+                end do
             else if (dst_field % ndims == 3) then
                 allocate(dst_field % array3r(dst_field % dimlens(1), &
                                              dst_field % dimlens(2), &
                                              dst_field % dimlens(3)))
-                if (dst_field % isTimeDependent) then
-                    do iy=1,size(nearestIndex, dim=2)
-                    do ix=1,size(nearestIndex, dim=1)
-                        dst_field % array3r(:,ix,iy) = src_field % array3r(:,nearestIndex(ix,iy),local_frame)
-                    end do
-                    end do
-                else
-                    do iy=1,size(nearestIndex, dim=2)
-                    do ix=1,size(nearestIndex, dim=1)
-                        dst_field % array3r(:,ix,iy) = src_field % array2r(:,nearestIndex(ix,iy))
-                    end do
-                    end do
-                end if
+                do iy=1,size(nearestIndex, dim=2)
+                do ix=1,size(nearestIndex, dim=1)
+                    dst_field % array3r(:,ix,iy) = src_field % array2r(:,nearestIndex(ix,iy))
+                end do
+                end do
             else if (dst_field % ndims == 4) then
                 allocate(dst_field % array4r(dst_field % dimlens(1), &
                                              dst_field % dimlens(2), &
                                              dst_field % dimlens(3), &
                                              dst_field % dimlens(4)))
-                if (dst_field % isTimeDependent) then
-                    do iy=1,size(nearestIndex, dim=2)
-                    do ix=1,size(nearestIndex, dim=1)
-                        dst_field % array4r(:,:,ix,iy) = src_field % array4r(:,:,nearestIndex(ix,iy),local_frame)
-                    end do
-                    end do
-                else
-                    do iy=1,size(nearestIndex, dim=2)
-                    do ix=1,size(nearestIndex, dim=1)
-                        dst_field % array4r(:,:,ix,iy) = src_field % array3r(:,:,nearestIndex(ix,iy))
-                    end do
-                    end do
-                end if
+                do iy=1,size(nearestIndex, dim=2)
+                do ix=1,size(nearestIndex, dim=1)
+                    dst_field % array4r(:,:,ix,iy) = src_field % array3r(:,:,nearestIndex(ix,iy))
+                end do
+                end do
             else
                 write(0,*) 'Remap exception: unhandled dimension for real ', dst_field % ndims
             end if
@@ -265,54 +234,30 @@ module remapper
             if (dst_field % ndims == 2) then
                 allocate(dst_field % array2d(dst_field % dimlens(1), &
                                              dst_field % dimlens(2)))
-                if (dst_field % isTimeDependent) then
-                    do iy=1,size(nearestIndex, dim=2)
-                    do ix=1,size(nearestIndex, dim=1)
-                        dst_field % array2d(ix,iy) = src_field % array2d(nearestIndex(ix,iy),local_frame)
-                    end do
-                    end do
-                else
-                    do iy=1,size(nearestIndex, dim=2)
-                    do ix=1,size(nearestIndex, dim=1)
-                        dst_field % array2d(ix,iy) = src_field % array1d(nearestIndex(ix,iy))
-                    end do
-                    end do
-                end if
+                do iy=1,size(nearestIndex, dim=2)
+                do ix=1,size(nearestIndex, dim=1)
+                    dst_field % array2d(ix,iy) = src_field % array1d(nearestIndex(ix,iy))
+                end do
+                end do
             else if (dst_field % ndims == 3) then
                 allocate(dst_field % array3d(dst_field % dimlens(1), &
                                              dst_field % dimlens(2), &
                                              dst_field % dimlens(3)))
-                if (dst_field % isTimeDependent) then
-                    do iy=1,size(nearestIndex, dim=2)
-                    do ix=1,size(nearestIndex, dim=1)
-                        dst_field % array3d(:,ix,iy) = src_field % array3d(:,nearestIndex(ix,iy),local_frame)
-                    end do
-                    end do
-                else
-                    do iy=1,size(nearestIndex, dim=2)
-                    do ix=1,size(nearestIndex, dim=1)
-                        dst_field % array3d(:,ix,iy) = src_field % array2d(:,nearestIndex(ix,iy))
-                    end do
-                    end do
-                end if
+                do iy=1,size(nearestIndex, dim=2)
+                do ix=1,size(nearestIndex, dim=1)
+                    dst_field % array3d(:,ix,iy) = src_field % array2d(:,nearestIndex(ix,iy))
+                end do
+                end do
             else if (dst_field % ndims == 4) then
                 allocate(dst_field % array4d(dst_field % dimlens(1), &
                                              dst_field % dimlens(2), &
                                              dst_field % dimlens(3), &
                                              dst_field % dimlens(4)))
-                if (dst_field % isTimeDependent) then
-                    do iy=1,size(nearestIndex, dim=2)
-                    do ix=1,size(nearestIndex, dim=1)
-                        dst_field % array4d(:,:,ix,iy) = src_field % array4d(:,:,nearestIndex(ix,iy),local_frame)
-                    end do
-                    end do
-                else
-                    do iy=1,size(nearestIndex, dim=2)
-                    do ix=1,size(nearestIndex, dim=1)
-                        dst_field % array4d(:,:,ix,iy) = src_field % array3d(:,:,nearestIndex(ix,iy))
-                    end do
-                    end do
-                end if
+                do iy=1,size(nearestIndex, dim=2)
+                do ix=1,size(nearestIndex, dim=1)
+                    dst_field % array4d(:,:,ix,iy) = src_field % array3d(:,:,nearestIndex(ix,iy))
+                end do
+                end do
             else
                 write(0,*) 'Remap exception: unhandled dimension for dbl ', dst_field % ndims
             end if
@@ -320,55 +265,30 @@ module remapper
             if (dst_field % ndims == 2) then
                 allocate(dst_field % array2i(dst_field % dimlens(1), &
                                              dst_field % dimlens(2)))
-                if (dst_field % isTimeDependent) then
-                    do iy=1,size(nearestIndex, dim=2)
-                    do ix=1,size(nearestIndex, dim=1)
-                        dst_field % array2i(ix,iy) = src_field % array2i(nearestIndex(ix,iy),local_frame)
-                    end do
-                    end do
-                else
-                    do iy=1,size(nearestIndex, dim=2)
-                    do ix=1,size(nearestIndex, dim=1)
-                        dst_field % array2i(ix,iy) = src_field % array1i(nearestIndex(ix,iy))
-                    end do
-                    end do
-                end if
+                do iy=1,size(nearestIndex, dim=2)
+                do ix=1,size(nearestIndex, dim=1)
+                    dst_field % array2i(ix,iy) = src_field % array1i(nearestIndex(ix,iy))
+                end do
+                end do
             else if (dst_field % ndims == 3) then
                 allocate(dst_field % array3i(dst_field % dimlens(1), &
                                              dst_field % dimlens(2), &
                                              dst_field % dimlens(3)))
-                if (dst_field % isTimeDependent) then
-                    do iy=1,size(nearestIndex, dim=2)
-                    do ix=1,size(nearestIndex, dim=1)
-                        dst_field % array3i(:,ix,iy) = src_field % array3i(:,nearestIndex(ix,iy),local_frame)
-                    end do
-                    end do
-                else
-                    do iy=1,size(nearestIndex, dim=2)
-                    do ix=1,size(nearestIndex, dim=1)
-                        dst_field % array3i(:,ix,iy) = src_field % array2i(:,nearestIndex(ix,iy))
-                    end do
-                    end do
-                end if
+                do iy=1,size(nearestIndex, dim=2)
+                do ix=1,size(nearestIndex, dim=1)
+                    dst_field % array3i(:,ix,iy) = src_field % array2i(:,nearestIndex(ix,iy))
+                end do
+                end do
             else if (dst_field % ndims == 4) then
                 allocate(dst_field % array4i(dst_field % dimlens(1), &
                                              dst_field % dimlens(2), &
                                              dst_field % dimlens(3), &
                                              dst_field % dimlens(4)))
-                if (dst_field % isTimeDependent) then
-!                    do iy=1,size(nearestIndex, dim=2)
-!                    do ix=1,size(nearestIndex, dim=1)
-!                        dst_field % array4i(:,:,ix,iy) = src_field % array4i(:,:,nearestIndex(ix,iy),local_frame)
-!                    end do
-!                    end do
-                     write(0,*) 'Remap exception: no support for time-dependent 3-d integer fields'
-                else
-                    do iy=1,size(nearestIndex, dim=2)
-                    do ix=1,size(nearestIndex, dim=1)
-                        dst_field % array4i(:,:,ix,iy) = src_field % array3i(:,:,nearestIndex(ix,iy))
-                    end do
-                    end do
-                end if
+                do iy=1,size(nearestIndex, dim=2)
+                do ix=1,size(nearestIndex, dim=1)
+                    dst_field % array4i(:,:,ix,iy) = src_field % array3i(:,:,nearestIndex(ix,iy))
+                end do
+                end do
             else
                 write(0,*) 'Remap exception: unhandled dimension for int ', dst_field % ndims
             end if
