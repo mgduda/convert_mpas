@@ -219,6 +219,7 @@ module file_output
                 stat = 1
                 return
             end if
+            handle % inDefineMode = .false.
         end if
 
         stat = nf90_inq_varid(handle % ncid, trim(field % name), varid)
