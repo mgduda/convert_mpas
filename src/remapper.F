@@ -35,6 +35,7 @@ module remapper
         integer, dimension(:), pointer :: array1i => null()
         integer, dimension(:,:), pointer :: array2i => null()
         integer, dimension(:,:,:), pointer :: array3i => null()
+        integer, dimension(:,:,:,:), pointer :: array4i => null()
     end type target_field_type
 
     private :: nearest_cell, nearest_vertex, sphere_distance
@@ -145,27 +146,235 @@ module remapper
     end function can_remap_field
 
 
-    integer function remap_field(remap_info, src_field, dst_field) result(stat)
+    integer function remap_field(remap_info, src_field, dst_field, frame) result(stat)
 
         implicit none
 
         type (remap_info_type), intent(in) :: remap_info
         type (input_field_type), intent(in) :: src_field
         type (target_field_type), intent(out) :: dst_field
+        integer, intent(in), optional :: frame
+
+        integer :: local_frame
+        integer :: decompDim
+        integer :: idim
+        integer :: iy, ix
+        integer, dimension(:,:), pointer :: nearestIndex
 
         stat = 0
 
-        ! something
-        dst_field % name = 'foo'
-        dst_field % xtype = FIELD_TYPE_DOUBLE
-        dst_field % ndims = 1
-        dst_field % isTimeDependent = .true.
-        allocate(dst_field % dimnames(1))
-        allocate(dst_field % dimlens(1))
-        dst_field % dimnames(1) = 'nLats'
-        dst_field % dimlens(1) = 180
-        allocate(dst_field % array1d(180))
-        dst_field % array1d(:) = 42.14159265359
+        local_frame = 1
+        if (present(frame)) then
+            local_frame = frame
+        end if
+
+        decompDim = src_field % ndims
+        if (src_field % isTimeDependent) then
+            decompDim = decompDim - 1
+        end if
+
+        if (trim(src_field % dimnames(decompDim)) == 'nCells') then
+            nearestIndex => remap_info % nearestCell
+        else if (trim(src_field % dimnames(decompDim)) == 'nVertices') then
+            nearestIndex => remap_info % nearestVertex
+        else if (trim(src_field % dimnames(decompDim)) == 'nEdges') then
+            nearestIndex => remap_info % nearestCell
+            write(0,*) 'Remap exception: edges not currently handled...'
+        else
+            write(0,*) 'Remap exception: unhandled decomposed dim'
+        end if
+
+        dst_field % name = src_field % name
+        dst_field % xtype = src_field % xtype
+        if (src_field % isTimeDependent) then
+            ! Single horizontal dimension becomes two horizontal dimensions, nlat and nlon,
+            ! but the time dimension is not counted in the target field
+            dst_field % ndims = src_field % ndims
+        else
+            ! Single horizontal dimension becomes two horizontal dimensions, nlat and nlon
+            dst_field % ndims = src_field % ndims + 1
+        end if
+        allocate(dst_field % dimnames(dst_field % ndims))
+        allocate(dst_field % dimlens(dst_field % ndims))
+        dst_field % isTimeDependent = src_field % isTimeDependent
+        do idim=1,dst_field % ndims-2
+            dst_field % dimlens(idim) = src_field % dimlens(idim)
+            dst_field % dimnames(idim) = src_field % dimnames(idim)
+        end do
+        dst_field % dimlens(dst_field % ndims-1) = size(remap_info % nearestCell, dim=1)
+        dst_field % dimnames(dst_field % ndims-1) = 'nLons'
+        dst_field % dimlens(dst_field % ndims) = size(remap_info % nearestCell, dim=2)
+        dst_field % dimnames(dst_field % ndims) = 'nLats'
+
+        if (src_field % xtype == FIELD_TYPE_REAL) then
+            if (dst_field % ndims == 2) then
+                allocate(dst_field % array2r(dst_field % dimlens(1), &
+                                             dst_field % dimlens(2)))
+                if (dst_field % isTimeDependent) then
+                    do iy=1,size(nearestIndex, dim=2)
+                    do ix=1,size(nearestIndex, dim=1)
+                        dst_field % array2r(ix,iy) = src_field % array2r(nearestIndex(ix,iy),local_frame)
+                    end do
+                    end do
+                else
+                    do iy=1,size(nearestIndex, dim=2)
+                    do ix=1,size(nearestIndex, dim=1)
+                        dst_field % array2r(ix,iy) = src_field % array1r(nearestIndex(ix,iy))
+                    end do
+                    end do
+                end if
+            else if (dst_field % ndims == 3) then
+                allocate(dst_field % array3r(dst_field % dimlens(1), &
+                                             dst_field % dimlens(2), &
+                                             dst_field % dimlens(3)))
+                if (dst_field % isTimeDependent) then
+                    do iy=1,size(nearestIndex, dim=2)
+                    do ix=1,size(nearestIndex, dim=1)
+                        dst_field % array3r(:,ix,iy) = src_field % array3r(:,nearestIndex(ix,iy),local_frame)
+                    end do
+                    end do
+                else
+                    do iy=1,size(nearestIndex, dim=2)
+                    do ix=1,size(nearestIndex, dim=1)
+                        dst_field % array3r(:,ix,iy) = src_field % array2r(:,nearestIndex(ix,iy))
+                    end do
+                    end do
+                end if
+            else if (dst_field % ndims == 4) then
+                allocate(dst_field % array4r(dst_field % dimlens(1), &
+                                             dst_field % dimlens(2), &
+                                             dst_field % dimlens(3), &
+                                             dst_field % dimlens(4)))
+                if (dst_field % isTimeDependent) then
+                    do iy=1,size(nearestIndex, dim=2)
+                    do ix=1,size(nearestIndex, dim=1)
+                        dst_field % array4r(:,:,ix,iy) = src_field % array4r(:,:,nearestIndex(ix,iy),local_frame)
+                    end do
+                    end do
+                else
+                    do iy=1,size(nearestIndex, dim=2)
+                    do ix=1,size(nearestIndex, dim=1)
+                        dst_field % array4r(:,:,ix,iy) = src_field % array3r(:,:,nearestIndex(ix,iy))
+                    end do
+                    end do
+                end if
+            else
+                write(0,*) 'Remap exception: unhandled dimension for real ', dst_field % ndims
+            end if
+        else if (src_field % xtype == FIELD_TYPE_DOUBLE) then
+            if (dst_field % ndims == 2) then
+                allocate(dst_field % array2d(dst_field % dimlens(1), &
+                                             dst_field % dimlens(2)))
+                if (dst_field % isTimeDependent) then
+                    do iy=1,size(nearestIndex, dim=2)
+                    do ix=1,size(nearestIndex, dim=1)
+                        dst_field % array2d(ix,iy) = src_field % array2d(nearestIndex(ix,iy),local_frame)
+                    end do
+                    end do
+                else
+                    do iy=1,size(nearestIndex, dim=2)
+                    do ix=1,size(nearestIndex, dim=1)
+                        dst_field % array2d(ix,iy) = src_field % array1d(nearestIndex(ix,iy))
+                    end do
+                    end do
+                end if
+            else if (dst_field % ndims == 3) then
+                allocate(dst_field % array3d(dst_field % dimlens(1), &
+                                             dst_field % dimlens(2), &
+                                             dst_field % dimlens(3)))
+                if (dst_field % isTimeDependent) then
+                    do iy=1,size(nearestIndex, dim=2)
+                    do ix=1,size(nearestIndex, dim=1)
+                        dst_field % array3d(:,ix,iy) = src_field % array3d(:,nearestIndex(ix,iy),local_frame)
+                    end do
+                    end do
+                else
+                    do iy=1,size(nearestIndex, dim=2)
+                    do ix=1,size(nearestIndex, dim=1)
+                        dst_field % array3d(:,ix,iy) = src_field % array2d(:,nearestIndex(ix,iy))
+                    end do
+                    end do
+                end if
+            else if (dst_field % ndims == 4) then
+                allocate(dst_field % array4d(dst_field % dimlens(1), &
+                                             dst_field % dimlens(2), &
+                                             dst_field % dimlens(3), &
+                                             dst_field % dimlens(4)))
+                if (dst_field % isTimeDependent) then
+                    do iy=1,size(nearestIndex, dim=2)
+                    do ix=1,size(nearestIndex, dim=1)
+                        dst_field % array4d(:,:,ix,iy) = src_field % array4d(:,:,nearestIndex(ix,iy),local_frame)
+                    end do
+                    end do
+                else
+                    do iy=1,size(nearestIndex, dim=2)
+                    do ix=1,size(nearestIndex, dim=1)
+                        dst_field % array4d(:,:,ix,iy) = src_field % array3d(:,:,nearestIndex(ix,iy))
+                    end do
+                    end do
+                end if
+            else
+                write(0,*) 'Remap exception: unhandled dimension for dbl ', dst_field % ndims
+            end if
+        else if (src_field % xtype == FIELD_TYPE_INTEGER) then
+            if (dst_field % ndims == 2) then
+                allocate(dst_field % array2i(dst_field % dimlens(1), &
+                                             dst_field % dimlens(2)))
+                if (dst_field % isTimeDependent) then
+                    do iy=1,size(nearestIndex, dim=2)
+                    do ix=1,size(nearestIndex, dim=1)
+                        dst_field % array2i(ix,iy) = src_field % array2i(nearestIndex(ix,iy),local_frame)
+                    end do
+                    end do
+                else
+                    do iy=1,size(nearestIndex, dim=2)
+                    do ix=1,size(nearestIndex, dim=1)
+                        dst_field % array2i(ix,iy) = src_field % array1i(nearestIndex(ix,iy))
+                    end do
+                    end do
+                end if
+            else if (dst_field % ndims == 3) then
+                allocate(dst_field % array3i(dst_field % dimlens(1), &
+                                             dst_field % dimlens(2), &
+                                             dst_field % dimlens(3)))
+                if (dst_field % isTimeDependent) then
+                    do iy=1,size(nearestIndex, dim=2)
+                    do ix=1,size(nearestIndex, dim=1)
+                        dst_field % array3i(:,ix,iy) = src_field % array3i(:,nearestIndex(ix,iy),local_frame)
+                    end do
+                    end do
+                else
+                    do iy=1,size(nearestIndex, dim=2)
+                    do ix=1,size(nearestIndex, dim=1)
+                        dst_field % array3i(:,ix,iy) = src_field % array2i(:,nearestIndex(ix,iy))
+                    end do
+                    end do
+                end if
+            else if (dst_field % ndims == 4) then
+                allocate(dst_field % array4i(dst_field % dimlens(1), &
+                                             dst_field % dimlens(2), &
+                                             dst_field % dimlens(3), &
+                                             dst_field % dimlens(4)))
+                if (dst_field % isTimeDependent) then
+!                    do iy=1,size(nearestIndex, dim=2)
+!                    do ix=1,size(nearestIndex, dim=1)
+!                        dst_field % array4i(:,:,ix,iy) = src_field % array4i(:,:,nearestIndex(ix,iy),local_frame)
+!                    end do
+!                    end do
+                     write(0,*) 'Remap exception: no support for time-dependent 3-d integer fields'
+                else
+                    do iy=1,size(nearestIndex, dim=2)
+                    do ix=1,size(nearestIndex, dim=1)
+                        dst_field % array4i(:,:,ix,iy) = src_field % array3i(:,:,nearestIndex(ix,iy))
+                    end do
+                    end do
+                end if
+            else
+                write(0,*) 'Remap exception: unhandled dimension for int ', dst_field % ndims
+            end if
+        else
+            write(0,*) 'Remap exception: unhandled type'
+        end if
 
     end function remap_field
 
@@ -219,6 +428,9 @@ module remapper
         end if
         if (associated(field % array3i)) then
             deallocate(field % array3i)
+        end if
+        if (associated(field % array4i)) then
+            deallocate(field % array4i)
         end if
 
     end function free_target_field

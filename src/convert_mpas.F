@@ -80,6 +80,7 @@ write(0,*) 'Freeing field'
     stat = file_output_open('blah.nc', output_handle)
 
     stat = remap_field(remap_info, field, target_field)
+write(0,*) 'remap status=', stat
     stat = file_output_register_field(output_handle, target_field)
 
     stat = file_output_write_field(output_handle, target_field)
