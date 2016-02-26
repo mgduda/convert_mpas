@@ -10,7 +10,6 @@ program convert_mpas
 
    
     integer :: stat
-    integer :: idim
     character (len=1024) :: filename
     type (mpas_mesh_type) :: source_mesh
     type (target_mesh_type) :: destination_mesh
@@ -35,7 +34,7 @@ program convert_mpas
         stop 2
     end if
 
-    if (target_mesh_setup(destination_mesh) /= 0) then
+    if (target_mesh_setup(destination_mesh, nlat=180, nlon=360) /= 0) then
         write(0,*) 'Error: Problems setting up target mesh'
         stop 3
     end if
@@ -45,54 +44,54 @@ program convert_mpas
         stop 4
     end if
 
-    stat = scan_input_open(filename, handle)
+    if (scan_input_open(filename, handle) /= 0) then
+        write(0,*) 'Error: Problems opening input file'
+        stop 5
+    end if
+
+    if (file_output_open('blah.nc', output_handle) /= 0) then
+        write(0,*) 'Error: Problems opening output file'
+        stop 6
+    end if
 
     do while (scan_input_next_field(handle, field) == 0) 
-       write(0,*) 'Field name = ', trim(field % name)
-       write(0,*) '   ', field % isTimeDependent
-       write(0,*) '   can remap? ', can_remap_field(field)
-       write(0,*) '   ndims=', field % ndims
-       do idim=1,field % ndims
-           write(0,*) '         ', trim(field % dimnames(idim))
-       end do
-       stat = scan_input_free_field(field)
-    end do
+        if (can_remap_field(field)) then
+            write(0,*) 'Remapping field '//trim(field % name)
+            stat = scan_input_read_field(field)    ! fix
+            stat = remap_field(remap_info, field, target_field)    ! fix
+            stat = file_output_register_field(output_handle, target_field)
 
-write(0,*) 'Checking for xCell'
-    if (scan_input_for_field(handle, 'xCell', field) /= 0) then
-        write(0,*) 'Scan for xCell failed...'
-    else
-        write(0,*) 'success: '//trim(field % name)
-        stat = scan_input_read_field(field)
-        if (stat /= 0) then
-            write(0,*) 'Error while reading xCell'
-        else
-write(0,*) 'eh? ', size(field % array1r)
-            write(0,*) field % array1r(1:10)
-            write(0,*) field % array1r(field % dimlens(1)-10:field % dimlens(1))
+            stat = free_target_field(target_field)
         end if
-    end if
-write(0,*) 'Freeing field'
+        stat = scan_input_free_field(field)
+    end do
 
     stat = scan_input_close(handle)
 
+write(0,*) '------------------'
 
-    stat = file_output_open('blah.nc', output_handle)
+    ! rewind would be nice
+    stat = scan_input_open(filename, handle)
 
-    stat = remap_field(remap_info, field, target_field)
-write(0,*) 'remap status=', stat
-    stat = file_output_register_field(output_handle, target_field)
+    do while (scan_input_next_field(handle, field) == 0) 
+        if (can_remap_field(field)) then
+            write(0,*) 'Actually remapping field '//trim(field % name)
+            stat = scan_input_read_field(field)
+            stat = remap_field(remap_info, field, target_field)
+            stat = file_output_write_field(output_handle, target_field)
 
-    stat = file_output_write_field(output_handle, target_field)
+            stat = free_target_field(target_field)
+        end if
+        stat = scan_input_free_field(field)
+    end do
 
+    stat = scan_input_close(handle)
+    stat = file_output_close(output_handle)
 
     stat = mpas_mesh_free(source_mesh)
     stat = target_mesh_free(destination_mesh)
-    stat = scan_input_free_field(field)
-    stat = free_target_field(target_field)
     stat = remap_info_free(remap_info)
 
-    stat = file_output_close(output_handle)
 
     stop
 
