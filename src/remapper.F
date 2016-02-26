@@ -51,10 +51,36 @@ module remapper
         type (target_mesh_type), intent(in) :: dst_mesh
         type (remap_info_type), intent(out) :: remap_info
 
+        integer :: idx
+        integer :: ix, iy
 
         stat = 0
 
         remap_info % method = 1
+
+        allocate(remap_info % nearestCell(dst_mesh % nlon, dst_mesh % nlat))
+        allocate(remap_info % nearestVertex(dst_mesh % nlon, dst_mesh % nlat))
+
+        idx = 1
+        do iy=1,dst_mesh % nlat
+        do ix=1,dst_mesh % nlon
+            idx = nearest_cell(dst_mesh % lats(iy), dst_mesh % lons(ix), idx, src_mesh % nCells, src_mesh % maxEdges, &
+                               src_mesh % nEdgesOnCell, src_mesh % cellsOnCell, src_mesh % latCell, src_mesh % lonCell)
+            remap_info % nearestCell(ix, iy) = idx
+        end do
+        end do
+
+        idx = 1
+        do iy=1,dst_mesh % nlat
+        do ix=1,dst_mesh % nlon
+            idx = nearest_vertex(dst_mesh % lats(iy), dst_mesh % lons(ix), idx, &
+                                 src_mesh % nCells, src_mesh % nVertices, src_mesh % maxEdges, &
+                                 src_mesh % nEdgesOnCell, src_mesh % verticesOnCell, &
+                                 src_mesh % cellsOnVertex, src_mesh % latCell, src_mesh % lonCell, &
+                                 src_mesh % latVertex, src_mesh % lonVertex )
+            remap_info % nearestVertex(ix, iy) = idx
+        end do
+        end do
 
     end function remap_info_setup
 
