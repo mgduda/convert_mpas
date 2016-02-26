@@ -502,6 +502,15 @@ module scan_input
             write(0,*) ' '
         end if
 
+        if (stat /= NF90_NOERR) then
+            write(0,*) ' '
+            write(0,*) 'NetCDF error: reading '//trim(field % name)//' returned ', stat
+            write(0,*) ' '
+            stat = 1
+        else
+            stat = 0
+        end if
+
     end function scan_input_read_field
 
 
