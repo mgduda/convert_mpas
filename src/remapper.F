@@ -10,6 +10,7 @@ module remapper
         type (target_mesh_type), pointer :: dst_mesh
         integer, dimension(:,:), pointer :: nearestCell
         integer, dimension(:,:), pointer :: nearestVertex
+        integer, dimension(:,:), pointer :: nearestEdge
     end type remap_info_type
 
     type target_field_type
@@ -61,6 +62,7 @@ module remapper
 
         allocate(remap_info % nearestCell(dst_mesh % nlon, dst_mesh % nlat))
         allocate(remap_info % nearestVertex(dst_mesh % nlon, dst_mesh % nlat))
+        allocate(remap_info % nearestEdge(dst_mesh % nlon, dst_mesh % nlat))
 
         idx = 1
         do iy=1,dst_mesh % nlat
@@ -75,11 +77,23 @@ module remapper
         do iy=1,dst_mesh % nlat
         do ix=1,dst_mesh % nlon
             idx = nearest_vertex(dst_mesh % lats(iy), dst_mesh % lons(ix), idx, &
-                                 src_mesh % nCells, src_mesh % nVertices, src_mesh % maxEdges, &
+                                 src_mesh % nCells, src_mesh % nVertices, src_mesh % maxEdges, 3, &
                                  src_mesh % nEdgesOnCell, src_mesh % verticesOnCell, &
                                  src_mesh % cellsOnVertex, src_mesh % latCell, src_mesh % lonCell, &
                                  src_mesh % latVertex, src_mesh % lonVertex )
             remap_info % nearestVertex(ix, iy) = idx
+        end do
+        end do
+
+        idx = 1
+        do iy=1,dst_mesh % nlat
+        do ix=1,dst_mesh % nlon
+            idx = nearest_vertex(dst_mesh % lats(iy), dst_mesh % lons(ix), idx, &
+                                 src_mesh % nCells, src_mesh % nEdges, src_mesh % maxEdges, 2, &
+                                 src_mesh % nEdgesOnCell, src_mesh % edgesOnCell, &
+                                 src_mesh % cellsOnEdge, src_mesh % latCell, src_mesh % lonCell, &
+                                 src_mesh % latEdge, src_mesh % lonEdge )
+            remap_info % nearestEdge(ix, iy) = idx
         end do
         end do
 
@@ -208,8 +222,7 @@ module remapper
         else if (trim(src_field % dimnames(decompDim)) == 'nVertices') then
             nearestIndex => remap_info % nearestVertex
         else if (trim(src_field % dimnames(decompDim)) == 'nEdges') then
-            nearestIndex => remap_info % nearestCell
-            write(0,*) 'Remap exception: edges not currently handled...'
+            nearestIndex => remap_info % nearestEdge
         else
             write(0,*) 'Remap exception: unhandled decomposed dim'
         end if
@@ -437,7 +450,7 @@ module remapper
 
     integer function nearest_vertex( target_lat, target_lon, &
                                      start_vertex, &
-                                     nCells, nVertices, maxEdges, &
+                                     nCells, nVertices, maxEdges, vertexDegree, &
                                      nEdgesOnCell, verticesOnCell, &
                                      cellsOnVertex, latCell, lonCell, &
                                      latVertex, lonVertex )
@@ -446,10 +459,10 @@ module remapper
 
         real, intent(in) :: target_lat, target_lon
         integer, intent(in) :: start_vertex
-        integer, intent(in) :: nCells, nVertices, maxEdges
+        integer, intent(in) :: nCells, nVertices, maxEdges, vertexDegree
         integer, dimension(nCells), intent(in) :: nEdgesOnCell
         integer, dimension(maxEdges,nCells), intent(in) :: verticesOnCell
-        integer, dimension(3,nVertices), intent(in) :: cellsOnVertex
+        integer, dimension(vertexDegree,nVertices), intent(in) :: cellsOnVertex
         real, dimension(nCells), intent(in) :: latCell, lonCell
         real, dimension(nVertices), intent(in) :: latVertex, lonVertex
 
@@ -471,22 +484,32 @@ module remapper
             nearest_vertex = current_vertex
             nearest_distance = current_distance
             cell1 = cellsOnVertex(1,current_vertex)
-            cell2 = cellsOnVertex(2,current_vertex)
-            cell3 = cellsOnVertex(3,current_vertex)
             cell1_dist = sphere_distance(latCell(cell1), lonCell(cell1), target_lat, target_lon, 1.0)
+            cell2 = cellsOnVertex(2,current_vertex)
             cell2_dist = sphere_distance(latCell(cell2), lonCell(cell2), target_lat, target_lon, 1.0)
-            cell3_dist = sphere_distance(latCell(cell3), lonCell(cell3), target_lat, target_lon, 1.0)
-            if (cell1_dist < cell2_dist) then
-                if (cell1_dist < cell3_dist) then
-                    iCell = cell1
+            if (vertexDegree == 3) then
+               cell3 = cellsOnVertex(3,current_vertex)
+               cell3_dist = sphere_distance(latCell(cell3), lonCell(cell3), target_lat, target_lon, 1.0)
+            end if
+            if (vertexDegree == 3) then
+                if (cell1_dist < cell2_dist) then
+                    if (cell1_dist < cell3_dist) then
+                        iCell = cell1
+                    else
+                        iCell = cell3
+                    end if
                 else
-                    iCell = cell3
+                    if (cell2_dist < cell3_dist) then
+                        iCell = cell2
+                    else
+                        iCell = cell3
+                    end if
                 end if
             else
-                if (cell2_dist < cell3_dist) then
-                    iCell = cell2
+                if (cell1_dist < cell2_dist) then
+                    iCell = cell1
                 else
-                    iCell = cell3
+                    iCell = cell2
                 end if
             end if
             do i = 1, nEdgesOnCell(iCell)
