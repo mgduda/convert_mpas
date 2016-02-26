@@ -23,7 +23,7 @@ module file_output
 
         stat = 0
 
-        stat = nf90_create(trim(filename), NF90_64BIT_OFFSET, handle % ncid)
+        stat = nf90_create(trim(filename), NF90_NETCDF4, handle % ncid)
         if (stat /= NF90_NOERR) then
             stat = 1
             return
