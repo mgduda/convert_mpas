@@ -190,6 +190,15 @@ module file_output
             write(0,*) ' '
         end if
 
+        if (stat /= NF90_NOERR) then
+            write(0,*) ' '
+            write(0,*) 'NetCDF error: defining variable '//trim(field % name)//' returned ', stat
+            write(0,*) ' '
+            stat = 1
+        else
+            stat = 0
+        end if
+
     end function file_output_register_field
 
 
@@ -414,6 +423,15 @@ module file_output
                 end if
             end if
 
+        end if
+
+        if (stat /= NF90_NOERR) then
+            write(0,*) ' '
+            write(0,*) 'NetCDF error: writing variable '//trim(field % name)//' returned ', stat
+            write(0,*) ' '
+            stat = 1
+        else
+            stat = 0
         end if
 
     end function file_output_write_field
