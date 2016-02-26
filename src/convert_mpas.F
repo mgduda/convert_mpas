@@ -57,8 +57,7 @@ program convert_mpas
     do while (scan_input_next_field(handle, field) == 0) 
         if (can_remap_field(field)) then
             write(0,*) 'Remapping field '//trim(field % name)
-            stat = scan_input_read_field(field)    ! fix
-            stat = remap_field(remap_info, field, target_field)    ! fix
+            stat = remap_field_dryrun(remap_info, field, target_field)
             stat = file_output_register_field(output_handle, target_field)
 
             stat = free_target_field(target_field)

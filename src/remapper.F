@@ -146,6 +146,43 @@ module remapper
     end function can_remap_field
 
 
+    integer function remap_field_dryrun(remap_info, src_field, dst_field) result(stat)
+
+        implicit none
+
+        type (remap_info_type), intent(in) :: remap_info
+        type (input_field_type), intent(in) :: src_field
+        type (target_field_type), intent(out) :: dst_field
+
+        integer :: idim
+
+        stat = 0
+
+        dst_field % name = src_field % name
+        dst_field % xtype = src_field % xtype
+        if (src_field % isTimeDependent) then
+            ! Single horizontal dimension becomes two horizontal dimensions, nlat and nlon,
+            ! but the time dimension is not counted in the target field
+            dst_field % ndims = src_field % ndims
+        else
+            ! Single horizontal dimension becomes two horizontal dimensions, nlat and nlon
+            dst_field % ndims = src_field % ndims + 1
+        end if
+        allocate(dst_field % dimnames(dst_field % ndims))
+        allocate(dst_field % dimlens(dst_field % ndims))
+        dst_field % isTimeDependent = src_field % isTimeDependent
+        do idim=1,dst_field % ndims-2
+            dst_field % dimlens(idim) = src_field % dimlens(idim)
+            dst_field % dimnames(idim) = src_field % dimnames(idim)
+        end do
+        dst_field % dimlens(dst_field % ndims-1) = size(remap_info % nearestCell, dim=1)
+        dst_field % dimnames(dst_field % ndims-1) = 'nLons'
+        dst_field % dimlens(dst_field % ndims) = size(remap_info % nearestCell, dim=2)
+        dst_field % dimnames(dst_field % ndims) = 'nLats'
+
+    end function remap_field_dryrun
+
+
     integer function remap_field(remap_info, src_field, dst_field) result(stat)
 
         implicit none
