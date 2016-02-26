@@ -11,10 +11,14 @@ module mpas_mesh
         integer, dimension(:,:), pointer :: cellsOnCell => null()
         integer, dimension(:,:), pointer :: verticesOnCell => null()
         integer, dimension(:,:), pointer :: cellsOnVertex => null()
+        integer, dimension(:,:), pointer :: edgesOnCell => null()
+        integer, dimension(:,:), pointer :: cellsOnEdge => null()
         real, dimension(:), pointer :: latCell => null()
         real, dimension(:), pointer :: lonCell => null()
         real, dimension(:), pointer :: latVertex => null()
         real, dimension(:), pointer :: lonVertex => null()
+        real, dimension(:), pointer :: latEdge => null()
+        real, dimension(:), pointer :: lonEdge => null()
     end type mpas_mesh_type
 
 
@@ -97,6 +101,32 @@ module mpas_mesh
         stat = scan_input_free_field(field)
 
         !
+        ! edgesOnCell
+        !
+        if (scan_input_for_field(handle, 'edgesOnCell', field) /= 0) then
+            stat = 1
+            return
+        end if
+
+        stat = scan_input_read_field(field)
+        allocate(mesh % edgesOnCell(mesh % maxEdges, mesh % nCells))
+        mesh % edgesOnCell(:,:) = field % array2i(:,:)
+        stat = scan_input_free_field(field)
+
+        !
+        ! cellsOnEdge
+        !
+        if (scan_input_for_field(handle, 'cellsOnEdge', field) /= 0) then
+            stat = 1
+            return
+        end if
+
+        stat = scan_input_read_field(field)
+        allocate(mesh % cellsOnEdge(2, mesh % nEdges))
+        mesh % cellsOnEdge(:,:) = field % array2i(:,:)
+        stat = scan_input_free_field(field)
+
+        !
         ! latCell
         !
         if (scan_input_for_field(handle, 'latCell', field) /= 0) then
@@ -163,6 +193,40 @@ module mpas_mesh
             mesh % lonVertex(:) = real(field % array1d(:))
         end if
         stat = scan_input_free_field(field)
+
+        !
+        ! latEdge
+        !
+        if (scan_input_for_field(handle, 'latEdge', field) /= 0) then
+            stat = 1
+            return
+        end if
+
+        stat = scan_input_read_field(field)
+        allocate(mesh % latEdge(mesh % nEdges))
+        if (field % xtype == FIELD_TYPE_REAL) then
+            mesh % latEdge(:) = field % array1r(:)
+        else if (field % xtype == FIELD_TYPE_DOUBLE) then
+            mesh % latEdge(:) = real(field % array1d(:))
+        end if
+        stat = scan_input_free_field(field)
+
+        !
+        ! lonEdge
+        !
+        if (scan_input_for_field(handle, 'lonEdge', field) /= 0) then
+            stat = 1
+            return
+        end if
+
+        stat = scan_input_read_field(field)
+        allocate(mesh % lonEdge(mesh % nEdges))
+        if (field % xtype == FIELD_TYPE_REAL) then
+            mesh % lonEdge(:) = field % array1r(:)
+        else if (field % xtype == FIELD_TYPE_DOUBLE) then
+            mesh % lonEdge(:) = real(field % array1d(:))
+        end if
+        stat = scan_input_free_field(field)
  
         stat = scan_input_close(handle)
 
@@ -195,6 +259,12 @@ module mpas_mesh
         if (associated(mesh % cellsOnVertex)) then
             deallocate(mesh % cellsOnVertex)
         end if
+        if (associated(mesh % edgesOnCell)) then
+            deallocate(mesh % edgesOnCell)
+        end if
+        if (associated(mesh % cellsOnEdge)) then
+            deallocate(mesh % cellsOnEdge)
+        end if
         if (associated(mesh % latCell)) then
             deallocate(mesh % latCell)
         end if
@@ -206,6 +276,12 @@ module mpas_mesh
         end if
         if (associated(mesh % lonVertex)) then
             deallocate(mesh % lonVertex)
+        end if
+        if (associated(mesh % latEdge)) then
+            deallocate(mesh % latEdge)
+        end if
+        if (associated(mesh % lonEdge)) then
+            deallocate(mesh % lonEdge)
         end if
 
     end function mpas_mesh_free
