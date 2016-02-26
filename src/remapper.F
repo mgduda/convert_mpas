@@ -225,6 +225,8 @@ module remapper
             nearestIndex => remap_info % nearestEdge
         else
             write(0,*) 'Remap exception: unhandled decomposed dim'
+            stat = 1
+            return
         end if
 
         dst_field % name = src_field % name
