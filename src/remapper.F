@@ -4,14 +4,23 @@ module remapper
     use scan_input, only : input_field_type, FIELD_TYPE_REAL, FIELD_TYPE_DOUBLE, FIELD_TYPE_INTEGER
     use target_mesh
 
+
     type remap_info_type
         integer :: method = -1
         type (mpas_mesh_type), pointer :: src_mesh
         type (target_mesh_type), pointer :: dst_mesh
+
+        ! For nearest-neighbor
         integer, dimension(:,:), pointer :: nearestCell
         integer, dimension(:,:), pointer :: nearestVertex
         integer, dimension(:,:), pointer :: nearestEdge
+
+        ! For Wachspress interpolation
+        integer, dimension(:,:), pointer :: cellWeights
+        integer, dimension(:,:), pointer :: vertexWeights
+        integer, dimension(:,:), pointer :: edgeWeights
     end type remap_info_type
+
 
     type target_field_type
         character (len=64) :: name
@@ -39,7 +48,14 @@ module remapper
         integer, dimension(:,:,:,:), pointer :: array4i => null()
     end type target_field_type
 
-    private :: nearest_cell, nearest_vertex, sphere_distance
+
+    private :: nearest_cell, &
+               nearest_vertex, &
+               sphere_distance, &
+               mpas_arc_length, &
+               mpas_triangle_signed_area_sphere, &
+               mpas_wachspress_coordinates, &
+               convert_lx
 
 
     contains
@@ -544,5 +560,211 @@ module remapper
         sphere_distance = 2.*radius*asin(arg1)
 
     end function sphere_distance
+
+
+    !***********************************************************************
+    !
+    !  function mpas_wachspress_coordinates
+    !
+    !> \brief Compute the barycentric Wachspress coordinates for a polygon
+    !> \author  Phillip Wolfram
+    !> \date    01/26/2015
+    !> \details
+    !>  Computes the barycentric Wachspress coordinates for a polygon with nVertices
+    !>  points in R3, vertCoords for a particular pointInterp with normalized radius.
+    !>  Follows Gillette, A., Rand, A., Bajaj, C., 2011.
+    !>  Error estimates for generalized barycentric interpolation.
+    !>  Advances in computational mathematics 37 (3), 417–439.
+    !>  Optimized version of mpas_wachspress_coordinates uses optional cached B_i areas
+    !------------------------------------------------------------------------
+    function mpas_wachspress_coordinates(nVertices, vertCoords, pointInterp, areaBin)
+
+        implicit none
+
+        ! input points
+        integer, intent(in) :: nVertices
+        real, dimension(3, nVertices), intent(in) :: vertCoords
+        real, dimension(3), intent(in) :: pointInterp
+        real, dimension(nVertices), optional, intent(in) :: areaBin
+
+        ! output
+        real, dimension(nVertices) :: mpas_wachspress_coordinates
+
+        ! computational intermediates
+        real, dimension(nVertices) :: wach       ! The wachpress area-product
+        real :: wach_total                       ! The wachpress total weight
+        integer :: i, j                                       ! Loop indices
+        integer :: im1, i0, ip1                               ! im1 = (i-1), i0 = i, ip1 = (i+1)
+  
+        ! triangle areas to compute wachspress coordinate
+        real, dimension(nVertices) :: areaA
+        real, dimension(nVertices) :: areaB
+
+        real :: radiusLocal
+
+        radiusLocal = sqrt(sum(vertCoords(:,1)**2))
+write(0,*) 'Computed radius ', radiusLocal
+
+        if (.not. present(areaBin)) then
+            ! compute areas
+            do i = 1, nVertices
+                ! compute first area B_i
+                ! get vertex indices
+                im1 = mod(nVertices + i - 2, nVertices) + 1
+                i0  = mod(nVertices + i - 1, nVertices) + 1
+                ip1 = mod(nVertices + i    , nVertices) + 1
+   
+                ! precompute B_i areas
+                ! always the same because B_i independent of xp,yp,zp
+                ! (COULD CACHE AND USE RESULT FROM ARRAY FOR FURTHER OPTIMIZATION)
+                areaB(i) = mpas_triangle_signed_area_sphere(vertCoords(:, im1), vertCoords(:, i0), vertCoords(:, ip1), radiusLocal)
+            end do
+        else
+            ! assign areas
+            do i = 1, nVertices
+                areaB(i) = areaBin(i)
+            end do
+        end if
+
+        ! compute areas
+        do i = 1, nVertices
+            ! compute first area B_i
+            ! get vertex indices
+            im1 = mod(nVertices + i - 2, nVertices) + 1
+            i0  = mod(nVertices + i - 1, nVertices) + 1
+            ip1 = mod(nVertices + i    , nVertices) + 1
+   
+            ! compute A_ij areas
+            ! must be computed each time
+            areaA(i0) = mpas_triangle_signed_area_sphere(pointInterp, vertCoords(:, i0), vertCoords(:, ip1), radiusLocal)
+   
+            ! precomputed B_i areas, cached
+        end do
+
+
+        ! for each vertex compute wachpress coordinate
+        do i = 1, nVertices
+            wach(i) = areaB(i)
+            do j = (i + 1), (i + nVertices - 2)
+                i0  = mod(nVertices + j - 1, nVertices) + 1
+                ! accumulate products for A_ij subareas
+                wach(i) = wach(i) * areaA(i0)
+            end do
+        end do
+
+        ! get summed weights for normalization
+        wach_total = 0
+        do i = 1, nVertices
+            wach_total = wach_total + wach(i)
+        end do
+
+        ! compute lambda
+        mpas_wachspress_coordinates= 0.0
+        do i = 1, nVertices
+            mpas_wachspress_coordinates(i) = wach(i)/wach_total
+        end do
+
+    end function mpas_wachspress_coordinates
+
+
+    !***********************************************************************
+    !
+    !  routine mpas_triangle_signed_area_sphere
+    !
+    !> \brief   Calculates area of a triangle on a sphere
+    !> \author  Matthew Hoffman
+    !> \date    13 January 2015
+    !> \details
+    !>  This routine calculates the area of a triangle on the surface of a sphere.
+    !>  Uses the spherical analog of Heron's formula.
+    !>  Copied from mesh generator.  A CCW winding angle is positive.
+    !-----------------------------------------------------------------------
+    real function mpas_triangle_signed_area_sphere(a, b, c, radius)
+
+        implicit none
+
+        !-----------------------------------------------------------------
+        ! input variables
+        !-----------------------------------------------------------------
+        real, dimension(3), intent(in) :: a, b, c  !< Input: 3d (x,y,z) points forming the triangle in which to calculate the bary weights
+        real, intent(in) :: radius  !< sphere radius
+ 
+        !-----------------------------------------------------------------
+        ! local variables
+        !-----------------------------------------------------------------
+        real :: ab, bc, ca, semiperim, tanqe
+        real, dimension(3) :: ablen, aclen, Dlen
+ 
+        ab = mpas_arc_length(a(1), a(2), a(3), b(1), b(2), b(3))/radius
+        bc = mpas_arc_length(b(1), b(2), b(3), c(1), c(2), c(3))/radius
+        ca = mpas_arc_length(c(1), c(2), c(3), a(1), a(2), a(3))/radius
+        semiperim = 0.5 * (ab + bc + ca)
+ 
+        tanqe = sqrt(max(0.0,tan(0.5 * semiperim) * tan(0.5 * (semiperim - ab)) &
+                     * tan(0.5 * (semiperim - bc)) * tan(0.5 * (semiperim - ca))))
+ 
+        mpas_triangle_signed_area_sphere = 4.0 * radius * radius * atan(tanqe)
+ 
+        ! computing correct signs (in similar fashion to mpas_sphere_angle)
+        ablen(1) = b(1) - a(1)
+        ablen(2) = b(2) - a(2)
+        ablen(3) = b(3) - a(3)
+ 
+        aclen(1) = c(1) - a(1)
+        aclen(2) = c(2) - a(2)
+        aclen(3) = c(3) - a(3)
+ 
+        dlen(1) =   (ablen(2) * aclen(3)) - (ablen(3) * aclen(2))
+        dlen(2) = -((ablen(1) * aclen(3)) - (ablen(3) * aclen(1)))
+        dlen(3) =   (ablen(1) * aclen(2)) - (ablen(2) * aclen(1))
+ 
+        if ((Dlen(1)*a(1) + Dlen(2)*a(2) + Dlen(3)*a(3)) < 0.0) then
+            mpas_triangle_signed_area_sphere = -mpas_triangle_signed_area_sphere
+        end if
+ 
+    end function mpas_triangle_signed_area_sphere
+
+
+    !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+    ! FUNCTION MPAS_ARC_LENGTH
+    !
+    ! Returns the length of the great circle arc from A=(ax, ay, az) to
+    !    B=(bx, by, bz). It is assumed that both A and B lie on the surface of the
+    !    same sphere centered at the origin.
+    !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+    real function mpas_arc_length(ax, ay, az, bx, by, bz)
+ 
+        implicit none
+ 
+        real, intent(in) :: ax, ay, az, bx, by, bz
+ 
+        real :: r, c
+        real :: cx, cy, cz
+ 
+        cx = bx - ax
+        cy = by - ay
+        cz = bz - az
+  
+        r = sqrt(ax*ax + ay*ay + az*az)
+        c = sqrt(cx*cx + cy*cy + cz*cz)
+
+        mpas_arc_length = r * 2.0 * asin(c/(2.0*r))
+ 
+    end function mpas_arc_length
+
+
+    function convert_lx(lat, lon, radius) result(vec)
+
+        implicit none
+
+        real, intent(in) :: lat, lon, radius
+
+        real, dimension(3) :: vec
+
+        vec(1) = radius * cos(lon) * cos(lat)
+        vec(2) = radius * sin(lon) * cos(lat)
+        vec(3) = radius * sin(lat)
+
+    end function convert_lx
 
 end module remapper
