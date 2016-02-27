@@ -11,14 +11,17 @@ module remapper
         type (target_mesh_type), pointer :: dst_mesh
 
         ! For nearest-neighbor
-        integer, dimension(:,:), pointer :: nearestCell
-        integer, dimension(:,:), pointer :: nearestVertex
-        integer, dimension(:,:), pointer :: nearestEdge
+        integer, dimension(:,:), pointer :: nearestCell => null()
+        integer, dimension(:,:), pointer :: nearestVertex => null()
+        integer, dimension(:,:), pointer :: nearestEdge => null()
 
         ! For Wachspress interpolation
-        integer, dimension(:,:), pointer :: cellWeights
-        integer, dimension(:,:), pointer :: vertexWeights
-        integer, dimension(:,:), pointer :: edgeWeights
+        real, dimension(:,:,:), pointer :: cellWeights => null()
+        real, dimension(:,:,:), pointer :: vertexWeights => null()
+        real, dimension(:,:,:), pointer :: edgeWeights => null()
+        integer, dimension(:,:,:), pointer :: sourceCells => null()
+        integer, dimension(:,:,:), pointer :: sourceVertices => null()
+        integer, dimension(:,:,:), pointer :: sourceEdges => null()
     end type remap_info_type
 
 
@@ -65,17 +68,26 @@ module remapper
 
         implicit none
 
-        type (mpas_mesh_type), intent(in) :: src_mesh
-        type (target_mesh_type), intent(in) :: dst_mesh
+        type (mpas_mesh_type), intent(in), target :: src_mesh
+        type (target_mesh_type), intent(in), target :: dst_mesh
         type (remap_info_type), intent(out) :: remap_info
 
         integer :: idx
+        integer :: j
+        integer :: nn
         integer :: ix, iy
+        real, dimension(:,:), allocatable :: vertCoords
+        real, dimension(3) :: pointInterp
 
         stat = 0
 
         remap_info % method = 1
+        remap_info % src_mesh => src_mesh
+        remap_info % dst_mesh => dst_mesh
 
+        !
+        ! For nearest neighbor
+        !
         allocate(remap_info % nearestCell(dst_mesh % nlon, dst_mesh % nlat))
         allocate(remap_info % nearestVertex(dst_mesh % nlon, dst_mesh % nlat))
         allocate(remap_info % nearestEdge(dst_mesh % nlon, dst_mesh % nlat))
@@ -113,6 +125,90 @@ module remapper
         end do
         end do
 
+
+        !
+        ! For Wachspress interpolation
+        !
+        allocate(vertCoords(3,3))
+
+        allocate(remap_info % cellWeights(3, dst_mesh % nlon, dst_mesh % nlat))
+        allocate(remap_info % sourceCells(3, dst_mesh % nlon, dst_mesh % nlat))
+
+        idx = 1
+        do iy=1,dst_mesh % nlat
+        do ix=1,dst_mesh % nlon
+            idx = nearest_vertex(dst_mesh % lats(iy), dst_mesh % lons(ix), idx, &
+                                 src_mesh % nCells, src_mesh % nVertices, src_mesh % maxEdges, 3, &
+                                 src_mesh % nEdgesOnCell, src_mesh % verticesOnCell, &
+                                 src_mesh % cellsOnVertex, src_mesh % latCell, src_mesh % lonCell, &
+                                 src_mesh % latVertex, src_mesh % lonVertex )
+            remap_info % sourceCells(:,ix,iy) = src_mesh % cellsOnVertex(:,idx)
+            pointInterp(:) = convert_lx(dst_mesh % lats(iy), dst_mesh % lons(ix), 6371229.0)
+            do j=1,3
+                vertCoords(:,j) = convert_lx(src_mesh % latCell(src_mesh % cellsOnVertex(j,idx)), &
+                                             src_mesh % lonCell(src_mesh % cellsOnVertex(j,idx)), &
+                                             6371229.0)
+            end do
+            remap_info % cellWeights(:,ix,iy) = mpas_wachspress_coordinates(3, vertCoords, pointInterp)
+        end do
+        end do
+
+        deallocate(vertCoords)
+
+
+        allocate(vertCoords(3,src_mesh % maxEdges))
+
+        allocate(remap_info % vertexWeights(src_mesh % maxEdges, dst_mesh % nlon, dst_mesh % nlat))
+        allocate(remap_info % sourceVertices(src_mesh % maxEdges, dst_mesh % nlon, dst_mesh % nlat))
+
+        idx = 1
+        do iy=1,dst_mesh % nlat
+        do ix=1,dst_mesh % nlon
+            idx = nearest_cell(dst_mesh % lats(iy), dst_mesh % lons(ix), idx, src_mesh % nCells, src_mesh % maxEdges, &
+                               src_mesh % nEdgesOnCell, src_mesh % cellsOnCell, src_mesh % latCell, src_mesh % lonCell)
+            nn = src_mesh % nEdgesOnCell(idx)
+            remap_info % sourceVertices(:,ix,iy) = 1
+            remap_info % sourceVertices(1:nn,ix,iy) = src_mesh % verticesOnCell(1:nn,idx)
+            pointInterp(:) = convert_lx(dst_mesh % lats(iy), dst_mesh % lons(ix), 6371229.0)
+            do j=1,nn
+                vertCoords(:,j) = convert_lx(src_mesh % latVertex(src_mesh % verticesOnCell(j,idx)), &
+                                             src_mesh % lonVertex(src_mesh % verticesOnCell(j,idx)), &
+                                             6371229.0)
+            end do
+            remap_info % vertexWeights(:,ix,iy) = 0.0
+            remap_info % vertexWeights(1:nn,ix,iy) = mpas_wachspress_coordinates(3, vertCoords(:,1:nn), pointInterp)
+        end do
+        end do
+
+        deallocate(vertCoords)
+
+
+        allocate(vertCoords(3,src_mesh % maxEdges))
+
+        allocate(remap_info % edgeWeights(src_mesh % maxEdges, dst_mesh % nlon, dst_mesh % nlat))
+        allocate(remap_info % sourceEdges(src_mesh % maxEdges, dst_mesh % nlon, dst_mesh % nlat))
+
+        idx = 1
+        do iy=1,dst_mesh % nlat
+        do ix=1,dst_mesh % nlon
+            idx = nearest_cell(dst_mesh % lats(iy), dst_mesh % lons(ix), idx, src_mesh % nCells, src_mesh % maxEdges, &
+                               src_mesh % nEdgesOnCell, src_mesh % cellsOnCell, src_mesh % latCell, src_mesh % lonCell)
+            nn = src_mesh % nEdgesOnCell(idx)
+            remap_info % sourceEdges(:,ix,iy) = 1
+            remap_info % sourceEdges(1:nn,ix,iy) = src_mesh % edgesOnCell(1:nn,idx)
+            pointInterp(:) = convert_lx(dst_mesh % lats(iy), dst_mesh % lons(ix), 6371229.0)
+            do j=1,nn
+                vertCoords(:,j) = convert_lx(src_mesh % latEdge(src_mesh % edgesOnCell(j,idx)), &
+                                             src_mesh % lonEdge(src_mesh % edgesOnCell(j,idx)), &
+                                             6371229.0)
+            end do
+            remap_info % edgeWeights(:,ix,iy) = 0.0
+            remap_info % edgeWeights(1:nn,ix,iy) = mpas_wachspress_coordinates(3, vertCoords(:,1:nn), pointInterp)
+        end do
+        end do
+
+        deallocate(vertCoords)
+
     end function remap_info_setup
 
 
@@ -126,12 +222,35 @@ module remapper
         stat = 0
 
         remap_info % method = -1
+        nullify(remap_info % src_mesh)
+        nullify(remap_info % dst_mesh)
 
         if (associated(remap_info % nearestCell)) then
             deallocate(remap_info % nearestCell)
         end if
         if (associated(remap_info % nearestVertex)) then
             deallocate(remap_info % nearestVertex)
+        end if
+        if (associated(remap_info % nearestEdge)) then
+            deallocate(remap_info % nearestEdge)
+        end if
+        if (associated(remap_info % cellWeights)) then
+            deallocate(remap_info % cellWeights)
+        end if
+        if (associated(remap_info % vertexWeights)) then
+            deallocate(remap_info % vertexWeights)
+        end if
+        if (associated(remap_info % edgeWeights)) then
+            deallocate(remap_info % edgeWeights)
+        end if
+        if (associated(remap_info % sourceCells)) then
+            deallocate(remap_info % sourceCells)
+        end if
+        if (associated(remap_info % sourceVertices)) then
+            deallocate(remap_info % sourceVertices)
+        end if
+        if (associated(remap_info % sourceEdges)) then
+            deallocate(remap_info % sourceEdges)
         end if
 
     end function remap_info_free
@@ -144,6 +263,7 @@ module remapper
         type (input_field_type), intent(in) :: field
 
         integer :: decompDim
+
 
         can_remap_field = .true.
 
@@ -205,9 +325,10 @@ module remapper
             dst_field % dimlens(idim) = src_field % dimlens(idim)
             dst_field % dimnames(idim) = src_field % dimnames(idim)
         end do
-        dst_field % dimlens(dst_field % ndims-1) = size(remap_info % nearestCell, dim=1)
+
+        dst_field % dimlens(dst_field % ndims-1) = remap_info % dst_mesh % nlon
         dst_field % dimnames(dst_field % ndims-1) = 'nLons'
-        dst_field % dimlens(dst_field % ndims) = size(remap_info % nearestCell, dim=2)
+        dst_field % dimlens(dst_field % ndims) = remap_info % dst_mesh % nlat
         dst_field % dimnames(dst_field % ndims) = 'nLats'
 
     end function remap_field_dryrun
@@ -223,8 +344,11 @@ module remapper
 
         integer :: decompDim
         integer :: idim
+        integer :: j
         integer :: iy, ix
         integer, dimension(:,:), pointer :: nearestIndex
+        integer, dimension(:,:,:), pointer :: sourceNodes
+        real, dimension(:,:,:), pointer :: nodeWeights
 
         stat = 0
 
@@ -235,10 +359,16 @@ module remapper
 
         if (trim(src_field % dimnames(decompDim)) == 'nCells') then
             nearestIndex => remap_info % nearestCell
+            sourceNodes => remap_info % sourceCells
+            nodeWeights => remap_info % cellWeights
         else if (trim(src_field % dimnames(decompDim)) == 'nVertices') then
             nearestIndex => remap_info % nearestVertex
+            sourceNodes => remap_info % sourceVertices
+            nodeWeights => remap_info % vertexWeights
         else if (trim(src_field % dimnames(decompDim)) == 'nEdges') then
             nearestIndex => remap_info % nearestEdge
+            sourceNodes => remap_info % sourceEdges
+            nodeWeights => remap_info % edgeWeights
         else
             write(0,*) 'Remap exception: unhandled decomposed dim'
             stat = 1
@@ -262,27 +392,51 @@ module remapper
             dst_field % dimlens(idim) = src_field % dimlens(idim)
             dst_field % dimnames(idim) = src_field % dimnames(idim)
         end do
-        dst_field % dimlens(dst_field % ndims-1) = size(remap_info % nearestCell, dim=1)
+        dst_field % dimlens(dst_field % ndims-1) = remap_info % dst_mesh % nlon
         dst_field % dimnames(dst_field % ndims-1) = 'nLons'
-        dst_field % dimlens(dst_field % ndims) = size(remap_info % nearestCell, dim=2)
+        dst_field % dimlens(dst_field % ndims) = remap_info % dst_mesh % nlat
         dst_field % dimnames(dst_field % ndims) = 'nLats'
 
         if (src_field % xtype == FIELD_TYPE_REAL) then
             if (dst_field % ndims == 2) then
                 allocate(dst_field % array2r(dst_field % dimlens(1), &
                                              dst_field % dimlens(2)))
+#if NEAREST_NEIGHBOR
                 do iy=1,size(nearestIndex, dim=2)
                 do ix=1,size(nearestIndex, dim=1)
                     dst_field % array2r(ix,iy) = src_field % array1r(nearestIndex(ix,iy))
+                end do
+                end do
+#endif
+                do iy=1,size(nearestIndex, dim=2)
+                do ix=1,size(nearestIndex, dim=1)
+                    dst_field % array2r(ix,iy) = 0.0
+                    do j=1,size(sourceNodes, dim=1)
+                        dst_field % array2r(ix,iy) = dst_field % array2r(ix,iy) + &
+                                                      nodeWeights(j,ix,iy) &
+                                                      * src_field % array1r(sourceNodes(j,ix,iy))
+                    end do
                 end do
                 end do
             else if (dst_field % ndims == 3) then
                 allocate(dst_field % array3r(dst_field % dimlens(1), &
                                              dst_field % dimlens(2), &
                                              dst_field % dimlens(3)))
+#if NEAREST_NEIGHBOR
                 do iy=1,size(nearestIndex, dim=2)
                 do ix=1,size(nearestIndex, dim=1)
                     dst_field % array3r(:,ix,iy) = src_field % array2r(:,nearestIndex(ix,iy))
+                end do
+                end do
+#endif
+                do iy=1,size(nearestIndex, dim=2)
+                do ix=1,size(nearestIndex, dim=1)
+                    dst_field % array3r(:,ix,iy) = 0.0
+                    do j=1,3
+                        dst_field % array3r(:,ix,iy) = dst_field % array3r(:,ix,iy) + &
+                                                        remap_info % cellWeights(j,ix,iy) &
+                                                        * src_field % array2r(:,remap_info % sourceCells(j,ix,iy))
+                    end do
                 end do
                 end do
             else if (dst_field % ndims == 4) then
@@ -290,9 +444,21 @@ module remapper
                                              dst_field % dimlens(2), &
                                              dst_field % dimlens(3), &
                                              dst_field % dimlens(4)))
+#if NEAREST_NEIGHBOR
                 do iy=1,size(nearestIndex, dim=2)
                 do ix=1,size(nearestIndex, dim=1)
                     dst_field % array4r(:,:,ix,iy) = src_field % array3r(:,:,nearestIndex(ix,iy))
+                end do
+                end do
+#endif
+                do iy=1,size(nearestIndex, dim=2)
+                do ix=1,size(nearestIndex, dim=1)
+                    dst_field % array4r(:,:,ix,iy) = 0.0
+                    do j=1,3
+                        dst_field % array4r(:,:,ix,iy) = dst_field % array4r(:,:,ix,iy) + &
+                                                          remap_info % cellWeights(j,ix,iy) &
+                                                          * src_field % array3r(:,:,remap_info % sourceCells(j,ix,iy))
+                    end do
                 end do
                 end do
             else
@@ -302,18 +468,42 @@ module remapper
             if (dst_field % ndims == 2) then
                 allocate(dst_field % array2d(dst_field % dimlens(1), &
                                              dst_field % dimlens(2)))
+#if NEAREST_NEIGHBOR
                 do iy=1,size(nearestIndex, dim=2)
                 do ix=1,size(nearestIndex, dim=1)
                     dst_field % array2d(ix,iy) = src_field % array1d(nearestIndex(ix,iy))
+                end do
+                end do
+#endif
+                do iy=1,size(nearestIndex, dim=2)
+                do ix=1,size(nearestIndex, dim=1)
+                    dst_field % array2d(ix,iy) = 0.0
+                    do j=1,size(sourceNodes, dim=1)
+                        dst_field % array2d(ix,iy) = dst_field % array2d(ix,iy) + &
+                                                      nodeWeights(j,ix,iy) &
+                                                      * src_field % array1d(sourceNodes(j,ix,iy))
+                    end do
                 end do
                 end do
             else if (dst_field % ndims == 3) then
                 allocate(dst_field % array3d(dst_field % dimlens(1), &
                                              dst_field % dimlens(2), &
                                              dst_field % dimlens(3)))
+#if NEAREST_NEIGHBOR
                 do iy=1,size(nearestIndex, dim=2)
                 do ix=1,size(nearestIndex, dim=1)
                     dst_field % array3d(:,ix,iy) = src_field % array2d(:,nearestIndex(ix,iy))
+                end do
+                end do
+#endif
+                do iy=1,size(nearestIndex, dim=2)
+                do ix=1,size(nearestIndex, dim=1)
+                    dst_field % array3d(:,ix,iy) = 0.0
+                    do j=1,3
+                        dst_field % array3d(:,ix,iy) = dst_field % array3d(:,ix,iy) + &
+                                                        remap_info % cellWeights(j,ix,iy) &
+                                                        * src_field % array2d(:,remap_info % sourceCells(j,ix,iy))
+                    end do
                 end do
                 end do
             else if (dst_field % ndims == 4) then
@@ -321,9 +511,21 @@ module remapper
                                              dst_field % dimlens(2), &
                                              dst_field % dimlens(3), &
                                              dst_field % dimlens(4)))
+#if NEAREST_NEIGHBOR
                 do iy=1,size(nearestIndex, dim=2)
                 do ix=1,size(nearestIndex, dim=1)
                     dst_field % array4d(:,:,ix,iy) = src_field % array3d(:,:,nearestIndex(ix,iy))
+                end do
+                end do
+#endif
+                do iy=1,size(nearestIndex, dim=2)
+                do ix=1,size(nearestIndex, dim=1)
+                    dst_field % array4d(:,:,ix,iy) = 0.0
+                    do j=1,3
+                        dst_field % array4d(:,:,ix,iy) = dst_field % array4d(:,:,ix,iy) + &
+                                                          remap_info % cellWeights(j,ix,iy) &
+                                                          * src_field % array3d(:,:,remap_info % sourceCells(j,ix,iy))
+                    end do
                 end do
                 end do
             else
@@ -603,7 +805,6 @@ module remapper
         real :: radiusLocal
 
         radiusLocal = sqrt(sum(vertCoords(:,1)**2))
-write(0,*) 'Computed radius ', radiusLocal
 
         if (.not. present(areaBin)) then
             ! compute areas
