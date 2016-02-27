@@ -11,7 +11,7 @@ program convert_mpas
 
    
     integer :: stat
-    character (len=1024) :: filename
+    character (len=1024) :: mesh_filename, data_filename
     type (mpas_mesh_type) :: source_mesh
     type (target_mesh_type) :: destination_mesh
     type (input_handle_type) :: handle
@@ -24,15 +24,29 @@ program convert_mpas
 
     if (command_argument_count() < 1) then
         write(0,*) ' '
-        write(0,*) 'Usage: convert_mpas [options]'
+        write(0,*) 'Usage: convert_mpas [mesh-file] data-file'
         write(0,*) ' '
+        write(0,*) 'If only one file argument is given, both the MPAS mesh information and'
+        write(0,*) 'the fields will be read from the specified file.'
+        write(0,*) 'If two file arguments are given, the MPAS mesh information will be read'
+        write(0,*) 'from the first file and fields to be remapped will be read from'
+        write(0,*) 'the second file.'
         stop 1
     end if
 
-    call get_command_argument(1, filename)
+    if (command_argument_count() == 1) then
+        call get_command_argument(1, mesh_filename)
+        call get_command_argument(1, data_filename)
+    else if (command_argument_count() == 2) then
+        call get_command_argument(1, mesh_filename)
+        call get_command_argument(2, data_filename)
+    end if
 
-    if (mpas_mesh_setup(filename, source_mesh) /= 0) then
-        write(0,*) 'Error: Problems setting up MPAS mesh from file '//trim(filename)
+    write(0,*) 'Reading MPAS mesh information from file '''//trim(mesh_filename)//''''
+    write(0,*) 'Reading MPAS fields from file '''//trim(data_filename)//''''
+
+    if (mpas_mesh_setup(mesh_filename, source_mesh) /= 0) then
+        write(0,*) 'Error: Problems setting up MPAS mesh from file '//trim(mesh_filename)
         stop 2
     end if
 
@@ -46,7 +60,7 @@ program convert_mpas
         stop 4
     end if
 
-    if (scan_input_open(filename, handle) /= 0) then
+    if (scan_input_open(data_filename, handle) /= 0) then
         write(0,*) 'Error: Problems opening input file'
         stop 5
     end if
