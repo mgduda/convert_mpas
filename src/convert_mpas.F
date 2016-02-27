@@ -5,6 +5,7 @@ program convert_mpas
     use target_mesh
     use remapper
     use file_output
+    use field_list
 
     implicit none
 
@@ -18,6 +19,7 @@ program convert_mpas
     type (remap_info_type) :: remap_info
     type (output_handle_type) :: output_handle
     type (target_field_type) :: target_field
+    type (field_list_type) :: include_field_list, exclude_field_list
 
 
     if (command_argument_count() < 1) then
@@ -49,13 +51,16 @@ program convert_mpas
         stop 5
     end if
 
-    if (file_output_open('blah.nc', output_handle) /= 0) then
+    if (file_output_open('latlon.nc', output_handle) /= 0) then
         write(0,*) 'Error: Problems opening output file'
         stop 6
     end if
 
+    stat = field_list_init(include_field_list, exclude_field_list)
+
     do while (scan_input_next_field(handle, field) == 0) 
-        if (can_remap_field(field)) then
+        if (can_remap_field(field) .and. &
+            should_remap_field(field, include_field_list, exclude_field_list)) then
             write(0,*) 'Remapping field '//trim(field % name)
             stat = remap_field_dryrun(remap_info, field, target_field)
             stat = file_output_register_field(output_handle, target_field)
@@ -68,7 +73,8 @@ program convert_mpas
     stat = scan_input_rewind(handle)
 
     do while (scan_input_next_field(handle, field) == 0) 
-        if (can_remap_field(field)) then
+        if (can_remap_field(field) .and. &
+            should_remap_field(field, include_field_list, exclude_field_list)) then
             write(0,*) 'Actually remapping field '//trim(field % name)
             stat = scan_input_read_field(field)
             stat = remap_field(remap_info, field, target_field)
@@ -85,7 +91,7 @@ program convert_mpas
     stat = mpas_mesh_free(source_mesh)
     stat = target_mesh_free(destination_mesh)
     stat = remap_info_free(remap_info)
-
+    stat = field_list_finalize(include_field_list, exclude_field_list)
 
     stop
 
