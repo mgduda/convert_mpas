@@ -11,7 +11,7 @@ OBJS = \
 all: $(OBJS)
 	$(FC) -o convert_mpas $(OBJS) $(FCLIBS)
 
-convert_mpas.o: scan_input.o mpas_mesh.o target_mesh.o file_output.o
+convert_mpas.o: scan_input.o mpas_mesh.o target_mesh.o file_output.o remapper.o
 
 remapper.o: mpas_mesh.o target_mesh.o
 
