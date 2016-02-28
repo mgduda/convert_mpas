@@ -26,8 +26,10 @@ module field_list
 
         stat = 0
 
+        write(0,*) ' '
         inquire(file='include_fields', exist=exists)
         if (exists) then
+            write(0,*) 'Reading list of fields to include in remapped output'
             open(21, file='include_fields', form='formatted')
             nlines = 0
             read(21,fmt=*,iostat=iostatus)
@@ -51,14 +53,13 @@ module field_list
             end do
             close(21)
         else
-            write(0,*) ' '
             write(0,*) 'List of fields to be included in output (''include_fields'') not found'
-            write(0,*) ' '
         end if
 
 
         inquire(file='exclude_fields', exist=exists)
         if (exists) then
+            write(0,*) 'Reading list of fields to exclude in remapped output'
             open(21, file='exclude_fields', form='formatted')
             nlines = 0
             read(21,fmt=*,iostat=iostatus)
@@ -82,9 +83,7 @@ module field_list
             end do
             close(21)
         else
-            write(0,*) ' '
             write(0,*) 'List of fields to be excluded from output (''exclude_fields'') not found'
-            write(0,*) ' '
         end if
 
     end function field_list_init
