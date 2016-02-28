@@ -23,13 +23,33 @@ Running 'convert_mpas' with no command-line arguments will print a usage summary
 
 By default, the 'convert_mpas' will remap all integer, real, or double-precision
 fields that it finds in the input data file. However, by creating a list of
-fields, named 'include_fields', in the run directory, with one field name per
-line, the 'convert_mpas' program will remap only those fields listed in the
-file.  Alternatively, one can create a list of fields to be excluded from the
-input file; this list should be written to a file named 'exclude_fields'.
+fields in a file named 'include_fields' in the run directory, with one field name 
+per line, the 'convert_mpas' program will remap only those fields listed in 
+the file. Alternatively, one can create a list of fields to be excluded from 
+the output file; this list should be written to a file named 'exclude_fields'.
 If both an 'include_fields' file and an 'exclude_fields' file are present in 
 the run directory, only fields listed in the 'include_fields' file will be 
 remapped, and the contents of the 'exclude_fields' file are ignored.
+
+The target domain defaults to a 0.5x0.5-degree global lat-lon grid. However, one
+may specify an alternate target domain using a file named 'target_domain' in 
+the run directory. This file may contain lines assigning values to keywords, i.e.,
+
+keyword = value
+
+The following are available keywords for describing the target domain:
+ - nlat : the number of latitude points in the grid (default value 360)
+ - nlon : the number of longitude points in the grid (default value 720)
+ - startlat : the starting latitude (default value -90.0)
+ - startlon : the starting longitude (default value -180.0)
+ - endlat : the ending latitude (default value 90.0)
+ - endlon : the ending longitude (default value 180.0)
+
+The actual points to which fields are interpolated are determined by dividing
+the latitude and longitude ranges into the specified number of intervals, then
+locating the interpolation points at the center of these intervals. For example,
+specifying startlat=0, endlat=10, and nlat=10 would result in target latitudes
+of 0.5, 1.5, ..., 8.5, and 9.5.
 
 ## Interpolation methodology:
 
@@ -42,9 +62,6 @@ are sampled from the corners or faces, respectively, of the Voronoi cell contain
 the target point.
 
 ## To-do:
-- Add command-line arguments to specify nLat, nLon, deltaLat, deltaLon, startLat, 
-  startLon, endLat, endLon
-- Add basic information on compiling and running to this README
 - Experiment with OpenMP directives to speed up interpolation
 - Clean up print statements and possibly add timing information to output
 - Ensure that, for cell fields, the interpolation location lies within the triangle 

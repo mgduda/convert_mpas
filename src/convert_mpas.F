@@ -45,13 +45,13 @@ program convert_mpas
     write(0,*) 'Reading MPAS mesh information from file '''//trim(mesh_filename)//''''
     write(0,*) 'Reading MPAS fields from file '''//trim(data_filename)//''''
 
-    if (mpas_mesh_setup(mesh_filename, source_mesh) /= 0) then
-        write(0,*) 'Error: Problems setting up MPAS mesh from file '//trim(mesh_filename)
+    if (target_mesh_setup(destination_mesh) /= 0) then
+        write(0,*) 'Error: Problems setting up target mesh'
         stop 2
     end if
 
-    if (target_mesh_setup(destination_mesh, nlat=180, nlon=360) /= 0) then
-        write(0,*) 'Error: Problems setting up target mesh'
+    if (mpas_mesh_setup(mesh_filename, source_mesh) /= 0) then
+        write(0,*) 'Error: Problems setting up MPAS mesh from file '//trim(mesh_filename)
         stop 3
     end if
 
