@@ -48,12 +48,13 @@ module scan_input
     contains
 
 
-    integer function scan_input_open(filename, handle) result(stat)
+    integer function scan_input_open(filename, handle, nRecords) result(stat)
 
         implicit none
 
         character (len=*), intent(in) :: filename
         type (input_handle_type), intent(out) :: handle
+        integer, intent(out), optional :: nRecords
 
  
         stat = 0
@@ -82,6 +83,14 @@ module scan_input
         if (stat /= NF90_NOERR) then
             stat = 1
             return
+        end if
+
+        if (present(nRecords)) then
+            stat = nf90_inquire_dimension(handle % ncid, handle % unlimited_dimid, len=nRecords)
+            if (stat /= NF90_NOERR) then
+                stat = 1
+                return
+            end if
         end if
 
         handle % current_var = 1

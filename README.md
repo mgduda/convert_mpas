@@ -69,3 +69,4 @@ the target point.
   to be specified with environment variables
 - Handle time dimension in both input and output files; for now, we can just keep 
   one time period per file
+- Decide what to do if input file contains no unlimited dimension
