@@ -4,37 +4,84 @@ module file_output
     use remapper, only : target_field_type
     use scan_input, only : FIELD_TYPE_REAL, FIELD_TYPE_DOUBLE, FIELD_TYPE_INTEGER, FIELD_TYPE_CHARACTER
 
+    integer, parameter :: FILE_MODE_CLOBBER = 1, &
+                          FILE_MODE_APPEND  = 2
+
     type output_handle_type
         integer :: ncid
         integer :: unlimitedID
         logical :: inDefineMode = .true.
+        integer :: current_frame = 0
     end type output_handle_type
 
 
     contains
 
 
-    integer function file_output_open(filename, handle) result(stat)
+    integer function file_output_open(filename, handle, mode, nRecords) result(stat)
 
         implicit none
 
         character (len=*), intent(in) :: filename
         type (output_handle_type), intent(out) :: handle
+        integer, intent(in), optional :: mode
+        integer, intent(out), optional :: nRecords
+
+        integer :: local_mode
+        logical :: exists
+
+        local_mode = FILE_MODE_CLOBBER
+        if (present(mode)) then
+            local_mode = mode
+        end if
 
         stat = 0
 
-        stat = nf90_create(trim(filename), NF90_NETCDF4, handle % ncid)
-        if (stat /= NF90_NOERR) then
-            stat = 1
-            return
+        inquire(file=trim(filename), exist=exists)
+
+        if ((exists .and. local_mode == FILE_MODE_CLOBBER) .or. (.not. exists)) then
+
+            stat = nf90_create(trim(filename), NF90_NETCDF4, handle % ncid)
+            if (stat /= NF90_NOERR) then
+                stat = 1
+                return
+            end if
+
+            handle % current_frame = 0
+            handle % inDefineMode = .true.
+
+            stat = nf90_def_dim(handle % ncid, 'Time', NF90_UNLIMITED, handle % unlimitedId)
+            if (stat /= NF90_NOERR) then
+                stat = 1
+                return
+            end if
+
+        else if (exists .and. local_mode == FILE_MODE_APPEND) then
+
+            stat = nf90_open(trim(filename), NF90_WRITE, handle % ncid)
+            if (stat /= NF90_NOERR) then
+                stat = 1
+                return
+            end if
+
+            handle % inDefineMode = .false.
+
+            stat = nf90_inquire(handle % ncid, unlimitedDimId=handle % unlimitedId)
+            if (stat /= NF90_NOERR) then
+                stat = 1
+                return
+            end if
+
+            stat = nf90_inquire_dimension(handle % ncid, handle % unlimitedId, len=handle % current_frame)
+            if (stat /= NF90_NOERR) then
+                stat = 1
+                return
+            end if
+
         end if
 
-        handle % inDefineMode = .true.
-
-        stat = nf90_def_dim(handle % ncid, 'Time', NF90_UNLIMITED, handle % unlimitedId)
-        if (stat /= NF90_NOERR) then
-            stat = 1
-            return
+        if (present(nRecords)) then
+            nRecords = handle % current_frame
         end if
 
     end function file_output_open
@@ -55,6 +102,7 @@ module file_output
         end if
 
         handle % inDefineMode = .true.
+        handle % current_frame = 0
 
     end function file_output_close
 
@@ -72,11 +120,6 @@ module file_output
 
         stat = 0
 
-        if (.not. handle % inDefineMode) then
-            stat = 1
-            return
-        end if
-
         do idim=1,field % ndims
             stat = nf90_inq_dimid(handle % ncid, trim(field % dimnames(idim)), dimids(idim))
             if (stat /= NF90_NOERR) then
@@ -86,6 +129,30 @@ module file_output
         if (field % isTimeDependent) then
             dimids(idim) = handle % unlimitedID
         end if
+
+        !
+        ! This variable is already defined, so we can return here
+        !
+        stat = nf90_inq_varid(handle % ncid, trim(field % name), varid)
+        if (stat == NF90_NOERR) then
+            stat = 0
+            return
+        end if 
+
+        !
+        ! We are dealing with an existing file
+        !
+        if (handle % current_frame > 0) then
+            write(0,*) 'Error: Defining new variable '//trim(field % name)//' in an existing file'
+            stat = 1
+            return
+        endif
+
+        if (.not. handle % inDefineMode) then
+            stat = 1
+            return
+        end if
+
 
         if (field % xtype == FIELD_TYPE_REAL) then
             if (field % ndims == 0) then
