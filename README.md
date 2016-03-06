@@ -70,3 +70,5 @@ the target point.
 - Handle time dimension in both input and output files; for now, we can just keep 
   one time period per file
 - Decide what to do if input file contains no unlimited dimension
+- Make sure that, when dealing with existing output files, the target mesh matches
+  what is found in the output file
