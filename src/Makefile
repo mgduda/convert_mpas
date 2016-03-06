@@ -15,7 +15,7 @@ all: $(OBJS)
 
 convert_mpas.o: scan_input.o mpas_mesh.o target_mesh.o file_output.o remapper.o field_list.o timer.o
 
-remapper.o: mpas_mesh.o target_mesh.o
+remapper.o: mpas_mesh.o target_mesh.o scan_input.o
 
 file_output.o: remapper.o scan_input.o
 
