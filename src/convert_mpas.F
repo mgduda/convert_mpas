@@ -29,32 +29,37 @@ program convert_mpas
 
     integer :: iRec
     integer :: nRecordsIn, nRecordsOut
+    integer :: iFile
+    integer :: fileArgStart, nArgs
     
 
     call timer_start(total_timer)
 
     if (command_argument_count() < 1) then
         write(0,*) ' '
-        write(0,*) 'Usage: convert_mpas [mesh-file] data-file'
+        write(0,*) 'Usage: convert_mpas mesh-file [data-files]'
         write(0,*) ' '
         write(0,*) 'If only one file argument is given, both the MPAS mesh information and'
         write(0,*) 'the fields will be read from the specified file.'
-        write(0,*) 'If two file arguments are given, the MPAS mesh information will be read'
-        write(0,*) 'from the first file and fields to be remapped will be read from'
-        write(0,*) 'the second file.'
+        write(0,*) 'If two or more file arguments are given, the MPAS mesh information will'
+        write(0,*) 'be read from the first file and fields to be remapped will be read from'
+        write(0,*) 'the subsequent files.'
+        write(0,*) 'All time records from input files will be processed and appended to'
+        write(0,*) 'the output file.'
         stop 1
     end if
 
-    if (command_argument_count() == 1) then
-        call get_command_argument(1, mesh_filename)
-        call get_command_argument(1, data_filename)
-    else if (command_argument_count() == 2) then
-        call get_command_argument(1, mesh_filename)
-        call get_command_argument(2, data_filename)
+    nArgs = command_argument_count()
+
+    call get_command_argument(1, mesh_filename)
+    if (nArgs == 1) then
+        fileArgStart = 1
+    else 
+        fileArgStart = 2
     end if
 
     write(0,*) 'Reading MPAS mesh information from file '''//trim(mesh_filename)//''''
-    write(0,*) 'Reading MPAS fields from file '''//trim(data_filename)//''''
+
 
     !
     ! Generate the target grid
@@ -89,26 +94,14 @@ program convert_mpas
     write(0,'(a,f10.6,a)') '    Time to compute remap weights: ', timer_time(remap_timer), ' s'
 
     !
-    ! Open input data file and output file
+    ! Open output file
     !
-    if (scan_input_open(data_filename, handle, nRecords=nRecordsIn) /= 0) then
-        write(0,*) 'Error: Problems opening input file'
-        write(0,*) '       This could result from an input file with no unlimited dimension.'
+    if (file_output_open('latlon.nc', output_handle, mode=FILE_MODE_APPEND, nRecords=nRecordsOut) /= 0) then
+        write(0,*) 'Error: Problems opening output file'
         stat = mpas_mesh_free(source_mesh)
         stat = target_mesh_free(destination_mesh)
         stat = remap_info_free(remap_info)
         stop 5
-    end if
-
-    write(0,*) 'Input file has ', nRecordsIn, ' records'
-
-    if (file_output_open('latlon.nc', output_handle, mode=FILE_MODE_APPEND, nRecords=nRecordsOut) /= 0) then
-        write(0,*) 'Error: Problems opening output file'
-        stat = scan_input_close(handle)
-        stat = mpas_mesh_free(source_mesh)
-        stat = target_mesh_free(destination_mesh)
-        stat = remap_info_free(remap_info)
-        stop 6
     end if
 
     if (nRecordsOut /= 0) then
@@ -122,78 +115,110 @@ program convert_mpas
     !
     stat = field_list_init(include_field_list, exclude_field_list)
 
-! generally, we should make sure dimensions match in existing output files
-!    and in subsequent MPAS input files
 
     !
-    ! Scan through input file, determine which fields will be remapped,
-    ! and define those fields in the output file
+    ! Loop over input data files
     !
-    write(0,*) ' '
-    if (nRecordsOut == 0) then
-        write(0,*) 'Defining fields in output file'
-    end if
-    do while (scan_input_next_field(handle, field) == 0) 
-        if (can_remap_field(field) .and. &
-            should_remap_field(field, include_field_list, exclude_field_list)) then
-            stat = remap_field_dryrun(remap_info, field, target_field)
-            stat = file_output_register_field(output_handle, target_field)
-            if (stat /= 0) then
-                stat = free_target_field(target_field)
-                stat = scan_input_free_field(field)
-                stat = scan_input_close(handle)
-                stat = file_output_close(output_handle)
-                stat = mpas_mesh_free(source_mesh)
-                stat = target_mesh_free(destination_mesh)
-                stat = remap_info_free(remap_info)
-                stat = field_list_finalize(include_field_list, exclude_field_list)
-                stop 7
-            end if
+    do iFile=fileArgStart,nArgs
+        call get_command_argument(iFile, data_filename)
+        write(0,*) 'Remapping MPAS fields from file '''//trim(data_filename)//''''
 
-            stat = free_target_field(target_field)
+        !
+        ! Open input data file
+        !
+        if (scan_input_open(data_filename, handle, nRecords=nRecordsIn) /= 0) then
+            write(0,*) 'Error: Problems opening input file '//trim(data_filename)
+            write(0,*) '       This could result from an input file with no unlimited dimension.'
+            stat = file_output_close(output_handle)
+            stat = scan_input_close(handle)
+            stat = mpas_mesh_free(source_mesh)
+            stat = target_mesh_free(destination_mesh)
+            stat = remap_info_free(remap_info)
+            stop 6
         end if
-        stat = scan_input_free_field(field)
-    end do
-
-    do iRec=1,nRecordsIn
-        stat = scan_input_rewind(handle)
-
+    
+        write(0,*) 'Input file has ', nRecordsIn, ' records'
+    
+! generally, we should make sure dimensions match in existing output files
+! and in subsequent MPAS input files
+    
         !
-        ! Scan through input file again, remapping fields and writing
-        ! them to the output file
+        ! Scan through input file, determine which fields will be remapped,
+        ! and define those fields in the output file; this only needs to be done
+        ! if there are no existing records in the output file (i.e., the output
+        ! file is a new file)
         !
-        do while (scan_input_next_field(handle, field) == 0) 
-            if (can_remap_field(field) .and. &
-                should_remap_field(field, include_field_list, exclude_field_list)) then
-                write(0,*) 'Remapping field '//trim(field % name)//', frame ', irec
+        write(0,*) ' '
+        if (nRecordsOut == 0) then
+            write(0,*) 'Defining fields in output file'
 
-                call timer_start(read_timer)
-                stat = scan_input_read_field(field, frame=iRec)
-                call timer_stop(read_timer)
-                write(0,'(a,f10.6,a)') '    read: ', timer_time(read_timer), ' s'
-
-                call timer_start(remap_timer)
-                stat = remap_field(remap_info, field, target_field)
-                call timer_stop(remap_timer)
-                write(0,'(a,f10.6,a)') '    remap: ', timer_time(remap_timer), ' s'
-
-                call timer_start(write_timer)
-                stat = file_output_write_field(output_handle, target_field, frame=(nRecordsOut+iRec))
-                call timer_stop(write_timer)
-                write(0,'(a,f10.6,a)') '    write: ', timer_time(write_timer), ' s'
-
-                stat = free_target_field(target_field)
-            end if
-            stat = scan_input_free_field(field)
+            do while (scan_input_next_field(handle, field) == 0) 
+                if (can_remap_field(field) .and. &
+                    should_remap_field(field, include_field_list, exclude_field_list)) then
+                    stat = remap_field_dryrun(remap_info, field, target_field)
+                    stat = file_output_register_field(output_handle, target_field)
+                    if (stat /= 0) then
+                        stat = free_target_field(target_field)
+                        stat = scan_input_free_field(field)
+                        stat = scan_input_close(handle)
+                        stat = file_output_close(output_handle)
+                        stat = mpas_mesh_free(source_mesh)
+                        stat = target_mesh_free(destination_mesh)
+                        stat = remap_info_free(remap_info)
+                        stat = field_list_finalize(include_field_list, exclude_field_list)
+                        stop 7
+                    end if
+        
+                    stat = free_target_field(target_field)
+                end if
+                stat = scan_input_free_field(field)
+            end do
+        end if
+    
+        !
+        ! Loop over all times in the input file
+        !
+        do iRec=1,nRecordsIn
+            stat = scan_input_rewind(handle)
+    
+            !
+            ! Scan through list of fields in the input file, remapping fields and writing
+            ! them to the output file
+            !
+            do while (scan_input_next_field(handle, field) == 0) 
+                if (can_remap_field(field) .and. &
+                    should_remap_field(field, include_field_list, exclude_field_list)) then
+                    write(0,*) 'Remapping field '//trim(field % name)//', frame ', irec
+    
+                    call timer_start(read_timer)
+                    stat = scan_input_read_field(field, frame=iRec)
+                    call timer_stop(read_timer)
+                    write(0,'(a,f10.6,a)') '    read: ', timer_time(read_timer), ' s'
+    
+                    call timer_start(remap_timer)
+                    stat = remap_field(remap_info, field, target_field)
+                    call timer_stop(remap_timer)
+                    write(0,'(a,f10.6,a)') '    remap: ', timer_time(remap_timer), ' s'
+    
+                    call timer_start(write_timer)
+                    stat = file_output_write_field(output_handle, target_field, frame=(nRecordsOut+iRec))
+                    call timer_stop(write_timer)
+                    write(0,'(a,f10.6,a)') '    write: ', timer_time(write_timer), ' s'
+    
+                    stat = free_target_field(target_field)
+                end if
+                stat = scan_input_free_field(field)
+            end do
         end do
+    
+        nRecordsOut = nRecordsOut + nRecordsIn
+        stat = scan_input_close(handle)
     end do
 
 
     !
     ! Cleanup
     !
-    stat = scan_input_close(handle)
-
     stat = file_output_close(output_handle)
 
     stat = mpas_mesh_free(source_mesh)

@@ -13,11 +13,15 @@ simply running 'make'.
 
 ## Running:
 
-The 'convert_mpas' program takes either one or two command-line arguments:
-- If only one file argument is given, both the MPAS mesh information and 
+The 'convert_mpas' program takes one or more command-line arguments:
+- If only one argument is given, both the MPAS mesh information and 
   the fields will be read from the specified file.
-- If two file arguments are given, the MPAS mesh information will be read from 
-  the first file and fields to be remapped will be read from the second file.
+- If two or more file arguments are given, the MPAS mesh information will 
+  be read from the first file and fields to be remapped will be read from
+  the subsequent files.
+
+All time records from input files will be processed and appended to the output 
+file, which is named 'latlon.nc'.
 
 Running 'convert_mpas' with no command-line arguments will print a usage summary.
 
@@ -62,13 +66,12 @@ are sampled from the corners or faces, respectively, of the Voronoi cell contain
 the target point.
 
 ## To-do:
-- Experiment with OpenMP directives to speed up interpolation
+- Transfer 'xtime' variable from input files to output file
 - Ensure that, for cell fields, the interpolation location lies within the triangle 
   used for interpolation
-- Allow locations of 'include_fields', 'exclude_fields', and 'target_domain' files
-  to be specified with environment variables
-- Handle time dimension in both input and output files; for now, we can just keep 
-  one time period per file
-- Decide what to do if input file contains no unlimited dimension
 - Make sure that, when dealing with existing output files, the target mesh matches
   what is found in the output file
+- Experiment with OpenMP directives to speed up interpolation
+- Allow locations of 'include_fields', 'exclude_fields', and 'target_domain' files
+  to be specified with environment variables
+- Decide what to do if input file contains no unlimited dimension
