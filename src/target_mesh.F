@@ -43,6 +43,8 @@ module target_mesh
             mesh % endLat   =  90.0
             mesh % startLon = -180.0
             mesh % endLon   =  180.0
+            mesh % nLat = 360
+            mesh % nLon = 720
 
             open(22, file='target_domain', form='formatted')
             read(22,fmt='(a)',iostat=iostatus) spec
