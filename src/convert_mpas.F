@@ -152,6 +152,15 @@ program convert_mpas
         if (nRecordsOut == 0) then
             write(0,*) 'Defining fields in output file'
 
+            ! Define 'lat' and 'lon' fields for target mesh
+            stat = remap_get_target_latitudes(remap_info, target_field)
+            stat = file_output_register_field(output_handle, target_field)
+            stat = free_target_field(target_field)
+
+            stat = remap_get_target_longitudes(remap_info, target_field)
+            stat = file_output_register_field(output_handle, target_field)
+            stat = free_target_field(target_field)
+
             do while (scan_input_next_field(handle, field) == 0) 
                 if (can_remap_field(field) .and. &
                     should_remap_field(field, include_field_list, exclude_field_list)) then
@@ -174,6 +183,21 @@ program convert_mpas
                 stat = scan_input_free_field(field)
             end do
         end if
+
+
+        ! 
+        ! Write 'lat' and 'lon' fields for target mesh
+        ! 
+        if (nRecordsOut == 0) then
+            stat = remap_get_target_latitudes(remap_info, target_field)
+            stat = file_output_write_field(output_handle, target_field, frame=0)
+            stat = free_target_field(target_field)
+
+            stat = remap_get_target_longitudes(remap_info, target_field)
+            stat = file_output_write_field(output_handle, target_field, frame=0)
+            stat = free_target_field(target_field)
+        end if
+
     
         !
         ! Loop over all times in the input file

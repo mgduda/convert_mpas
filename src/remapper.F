@@ -569,6 +569,60 @@ module remapper
     end function remap_field
 
 
+    integer function remap_get_target_latitudes(remap_info, lat_field) result(stat)
+
+        implicit none
+
+        type (remap_info_type), intent(in) :: remap_info
+        type (target_field_type), intent(out) :: lat_field
+
+        stat = 0
+
+
+        lat_field % name = 'lat'
+        lat_field % xtype = FIELD_TYPE_REAL
+        lat_field % ndims = 1
+        lat_field % isTimeDependent = .false.
+
+        allocate(lat_field % dimnames(lat_field % ndims))
+        allocate(lat_field % dimlens(lat_field % ndims))
+
+        lat_field % dimnames(1) = 'nLats'
+        lat_field % dimlens(1) = remap_info % dst_mesh % nlat
+
+        allocate(lat_field % array1r(lat_field % dimlens(1)))
+        lat_field % array1r(:) = remap_info % dst_mesh % lats(:)
+
+    end function remap_get_target_latitudes
+
+
+    integer function remap_get_target_longitudes(remap_info, lon_field) result(stat)
+
+        implicit none
+
+        type (remap_info_type), intent(in) :: remap_info
+        type (target_field_type), intent(out) :: lon_field
+
+        stat = 0
+
+
+        lon_field % name = 'lon'
+        lon_field % xtype = FIELD_TYPE_REAL
+        lon_field % ndims = 1
+        lon_field % isTimeDependent = .false.
+
+        allocate(lon_field % dimnames(lon_field % ndims))
+        allocate(lon_field % dimlens(lon_field % ndims))
+
+        lon_field % dimnames(1) = 'nLons'
+        lon_field % dimlens(1) = remap_info % dst_mesh % nlon
+
+        allocate(lon_field % array1r(lon_field % dimlens(1)))
+        lon_field % array1r(:) = remap_info % dst_mesh % lons(:)
+
+    end function remap_get_target_longitudes
+
+
     integer function free_target_field(field) result(stat)
 
         implicit none
