@@ -576,6 +576,8 @@ module remapper
         type (remap_info_type), intent(in) :: remap_info
         type (target_field_type), intent(out) :: lat_field
 
+        real, parameter :: rad2deg = 90.0 / asin(1.0)
+
         stat = 0
 
 
@@ -591,7 +593,7 @@ module remapper
         lat_field % dimlens(1) = remap_info % dst_mesh % nlat
 
         allocate(lat_field % array1r(lat_field % dimlens(1)))
-        lat_field % array1r(:) = remap_info % dst_mesh % lats(:)
+        lat_field % array1r(:) = remap_info % dst_mesh % lats(:) * rad2deg
 
     end function remap_get_target_latitudes
 
@@ -602,6 +604,8 @@ module remapper
 
         type (remap_info_type), intent(in) :: remap_info
         type (target_field_type), intent(out) :: lon_field
+
+        real, parameter :: rad2deg = 90.0 / asin(1.0)
 
         stat = 0
 
@@ -618,7 +622,7 @@ module remapper
         lon_field % dimlens(1) = remap_info % dst_mesh % nlon
 
         allocate(lon_field % array1r(lon_field % dimlens(1)))
-        lon_field % array1r(:) = remap_info % dst_mesh % lons(:)
+        lon_field % array1r(:) = remap_info % dst_mesh % lons(:) * rad2deg
 
     end function remap_get_target_longitudes
 
