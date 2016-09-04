@@ -91,6 +91,13 @@ module scan_input
                 stat = 1
                 return
             end if
+
+            ! In case we have an input file that no time-varying records but
+            ! does have time-invariant fields, set nRecords = 1 so that we can
+            ! at least extract these fields
+            if ((nRecords == 0) .and. (handle % num_vars > 0)) then
+                nRecords = 1
+            end if
         end if
 
         handle % current_var = 1
