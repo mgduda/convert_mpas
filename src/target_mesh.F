@@ -1,6 +1,7 @@
 module target_mesh
 
     type target_mesh_type
+        logical :: valid = .false.
         integer :: nLat = 0
         integer :: nLon = 0
         real :: startLat = 0.0
@@ -117,6 +118,8 @@ module target_mesh
            mesh % lons(i+1) = mesh % lons(i+1) * pi_const / 180.0
         end do
 
+        mesh % valid = .true.
+
     end function target_mesh_setup
 
 
@@ -129,6 +132,7 @@ module target_mesh
 
         stat = 0
 
+        mesh % valid = .false.
         mesh % nLat = 0
         mesh % nLon = 0
         mesh % startLat = 0.0

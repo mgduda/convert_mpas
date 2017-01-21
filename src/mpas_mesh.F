@@ -3,6 +3,7 @@ module mpas_mesh
     use scan_input
 
     type mpas_mesh_type
+        logical :: valid = .false.
         integer :: nCells = 0
         integer :: nVertices = 0
         integer :: nEdges = 0
@@ -230,6 +231,8 @@ module mpas_mesh
  
         stat = scan_input_close(handle)
 
+        mesh % valid = .true.
+
     end function mpas_mesh_setup
 
 
@@ -242,6 +245,7 @@ module mpas_mesh
 
         stat = 0
 
+        mesh % valid = .false.
         mesh % nCells = 0
         mesh % nVertices = 0
         mesh % nEdges = 0
