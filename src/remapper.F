@@ -58,7 +58,8 @@ module remapper
                mpas_arc_length, &
                mpas_triangle_signed_area_sphere, &
                mpas_wachspress_coordinates, &
-               convert_lx
+               convert_lx, &
+               index2d
 
 
     contains
@@ -76,6 +77,7 @@ module remapper
         integer :: j
         integer :: nn
         integer :: ix, iy
+        integer :: irank
         real, dimension(:,:), allocatable :: vertCoords
         real, dimension(3) :: pointInterp
 
@@ -92,10 +94,13 @@ module remapper
         allocate(remap_info % nearestVertex(dst_mesh % nlon, dst_mesh % nlat))
         allocate(remap_info % nearestEdge(dst_mesh % nlon, dst_mesh % nlat))
 
+        irank = dst_mesh % irank
+
         idx = 1
         do iy=1,dst_mesh % nlat
         do ix=1,dst_mesh % nlon
-            idx = nearest_cell(dst_mesh % lats(iy), dst_mesh % lons(ix), idx, src_mesh % nCells, src_mesh % maxEdges, &
+            idx = nearest_cell(dst_mesh % lats(index2d(irank,ix),iy), dst_mesh % lons(ix,index2d(irank,iy)), idx, &
+                               src_mesh % nCells, src_mesh % maxEdges, &
                                src_mesh % nEdgesOnCell, src_mesh % cellsOnCell, src_mesh % latCell, src_mesh % lonCell)
             remap_info % nearestCell(ix, iy) = idx
         end do
@@ -104,7 +109,7 @@ module remapper
         idx = 1
         do iy=1,dst_mesh % nlat
         do ix=1,dst_mesh % nlon
-            idx = nearest_vertex(dst_mesh % lats(iy), dst_mesh % lons(ix), idx, &
+            idx = nearest_vertex(dst_mesh % lats(index2d(irank,ix),iy), dst_mesh % lons(ix,index2d(irank,iy)), idx, &
                                  src_mesh % nCells, src_mesh % nVertices, src_mesh % maxEdges, 3, &
                                  src_mesh % nEdgesOnCell, src_mesh % verticesOnCell, &
                                  src_mesh % cellsOnVertex, src_mesh % latCell, src_mesh % lonCell, &
@@ -116,7 +121,7 @@ module remapper
         idx = 1
         do iy=1,dst_mesh % nlat
         do ix=1,dst_mesh % nlon
-            idx = nearest_vertex(dst_mesh % lats(iy), dst_mesh % lons(ix), idx, &
+            idx = nearest_vertex(dst_mesh % lats(index2d(irank,ix),iy), dst_mesh % lons(ix,index2d(irank,iy)), idx, &
                                  src_mesh % nCells, src_mesh % nEdges, src_mesh % maxEdges, 2, &
                                  src_mesh % nEdgesOnCell, src_mesh % edgesOnCell, &
                                  src_mesh % cellsOnEdge, src_mesh % latCell, src_mesh % lonCell, &
@@ -137,13 +142,13 @@ module remapper
         idx = 1
         do iy=1,dst_mesh % nlat
         do ix=1,dst_mesh % nlon
-            idx = nearest_vertex(dst_mesh % lats(iy), dst_mesh % lons(ix), idx, &
+            idx = nearest_vertex(dst_mesh % lats(index2d(irank,ix),iy), dst_mesh % lons(ix,index2d(irank,iy)), idx, &
                                  src_mesh % nCells, src_mesh % nVertices, src_mesh % maxEdges, 3, &
                                  src_mesh % nEdgesOnCell, src_mesh % verticesOnCell, &
                                  src_mesh % cellsOnVertex, src_mesh % latCell, src_mesh % lonCell, &
                                  src_mesh % latVertex, src_mesh % lonVertex )
             remap_info % sourceCells(:,ix,iy) = src_mesh % cellsOnVertex(:,idx)
-            pointInterp(:) = convert_lx(dst_mesh % lats(iy), dst_mesh % lons(ix), 6371229.0)
+            pointInterp(:) = convert_lx(dst_mesh % lats(index2d(irank,ix),iy), dst_mesh % lons(ix,index2d(irank,iy)), 6371229.0)
             do j=1,3
                 vertCoords(:,j) = convert_lx(src_mesh % latCell(src_mesh % cellsOnVertex(j,idx)), &
                                              src_mesh % lonCell(src_mesh % cellsOnVertex(j,idx)), &
@@ -164,12 +169,13 @@ module remapper
         idx = 1
         do iy=1,dst_mesh % nlat
         do ix=1,dst_mesh % nlon
-            idx = nearest_cell(dst_mesh % lats(iy), dst_mesh % lons(ix), idx, src_mesh % nCells, src_mesh % maxEdges, &
+            idx = nearest_cell(dst_mesh % lats(index2d(irank,ix),iy), dst_mesh % lons(ix,index2d(irank,iy)), idx, &
+                               src_mesh % nCells, src_mesh % maxEdges, &
                                src_mesh % nEdgesOnCell, src_mesh % cellsOnCell, src_mesh % latCell, src_mesh % lonCell)
             nn = src_mesh % nEdgesOnCell(idx)
             remap_info % sourceVertices(:,ix,iy) = 1
             remap_info % sourceVertices(1:nn,ix,iy) = src_mesh % verticesOnCell(1:nn,idx)
-            pointInterp(:) = convert_lx(dst_mesh % lats(iy), dst_mesh % lons(ix), 6371229.0)
+            pointInterp(:) = convert_lx(dst_mesh % lats(index2d(irank,ix),iy), dst_mesh % lons(ix,index2d(irank,iy)), 6371229.0)
             do j=1,nn
                 vertCoords(:,j) = convert_lx(src_mesh % latVertex(src_mesh % verticesOnCell(j,idx)), &
                                              src_mesh % lonVertex(src_mesh % verticesOnCell(j,idx)), &
@@ -191,12 +197,13 @@ module remapper
         idx = 1
         do iy=1,dst_mesh % nlat
         do ix=1,dst_mesh % nlon
-            idx = nearest_cell(dst_mesh % lats(iy), dst_mesh % lons(ix), idx, src_mesh % nCells, src_mesh % maxEdges, &
+            idx = nearest_cell(dst_mesh % lats(index2d(irank,ix),iy), dst_mesh % lons(ix,index2d(irank,iy)), idx, &
+                               src_mesh % nCells, src_mesh % maxEdges, &
                                src_mesh % nEdgesOnCell, src_mesh % cellsOnCell, src_mesh % latCell, src_mesh % lonCell)
             nn = src_mesh % nEdgesOnCell(idx)
             remap_info % sourceEdges(:,ix,iy) = 1
             remap_info % sourceEdges(1:nn,ix,iy) = src_mesh % edgesOnCell(1:nn,idx)
-            pointInterp(:) = convert_lx(dst_mesh % lats(iy), dst_mesh % lons(ix), 6371229.0)
+            pointInterp(:) = convert_lx(dst_mesh % lats(index2d(irank,ix),iy), dst_mesh % lons(ix,index2d(irank,iy)), 6371229.0)
             do j=1,nn
                 vertCoords(:,j) = convert_lx(src_mesh % latEdge(src_mesh % edgesOnCell(j,idx)), &
                                              src_mesh % lonEdge(src_mesh % edgesOnCell(j,idx)), &
@@ -593,7 +600,7 @@ module remapper
         lat_field % dimlens(1) = remap_info % dst_mesh % nlat
 
         allocate(lat_field % array1r(lat_field % dimlens(1)))
-        lat_field % array1r(:) = remap_info % dst_mesh % lats(:) * rad2deg
+        lat_field % array1r(:) = remap_info % dst_mesh % lats(1,:) * rad2deg
 
     end function remap_get_target_latitudes
 
@@ -622,7 +629,7 @@ module remapper
         lon_field % dimlens(1) = remap_info % dst_mesh % nlon
 
         allocate(lon_field % array1r(lon_field % dimlens(1)))
-        lon_field % array1r(:) = remap_info % dst_mesh % lons(:) * rad2deg
+        lon_field % array1r(:) = remap_info % dst_mesh % lons(:,1) * rad2deg
 
     end function remap_get_target_longitudes
 
@@ -1025,5 +1032,18 @@ module remapper
         vec(3) = radius * sin(lat)
 
     end function convert_lx
+
+
+    function index2d(irank, idx) result(i)
+
+        implicit none
+
+        integer, intent(in) :: irank, idx
+
+        integer :: i
+
+        i = irank * (idx - 1) + 1
+
+    end function index2d
 
 end module remapper

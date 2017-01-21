@@ -2,14 +2,15 @@ module target_mesh
 
     type target_mesh_type
         logical :: valid = .false.
+        integer :: irank = 0
         integer :: nLat = 0
         integer :: nLon = 0
         real :: startLat = 0.0
         real :: endLat = 0.0
         real :: startLon = 0.0
         real :: endLon = 0.0
-        real, dimension(:), pointer :: lats => null()
-        real, dimension(:), pointer :: lons => null()
+        real, dimension(:,:), pointer :: lats => null()
+        real, dimension(:,:), pointer :: lons => null()
     end type target_mesh_type
 
 
@@ -103,19 +104,19 @@ module target_mesh
         end if
 
 
-        allocate(mesh % lats(mesh % nLat))
-        allocate(mesh % lons(mesh % nLon))
+        allocate(mesh % lats(1, mesh % nLat))
+        allocate(mesh % lons(mesh % nLon, 1))
 
         delta = (mesh % endLat - mesh % startLat) / real(mesh % nLat)
         do i=0,mesh % nLat-1
-           mesh % lats(i+1) = mesh % startLat + 0.5 * delta + real(i) * delta
-           mesh % lats(i+1) = mesh % lats(i+1) * pi_const / 180.0
+           mesh % lats(1,i+1) = mesh % startLat + 0.5 * delta + real(i) * delta
+           mesh % lats(1,i+1) = mesh % lats(1,i+1) * pi_const / 180.0
         end do
 
         delta = (mesh % endLon - mesh % startLon) / real(mesh % nLon)
         do i=0,mesh % nLon-1
-           mesh % lons(i+1) = mesh % startLon + 0.5 * delta + real(i) * delta
-           mesh % lons(i+1) = mesh % lons(i+1) * pi_const / 180.0
+           mesh % lons(i+1,1) = mesh % startLon + 0.5 * delta + real(i) * delta
+           mesh % lons(i+1,1) = mesh % lons(i+1,1) * pi_const / 180.0
         end do
 
         mesh % valid = .true.
