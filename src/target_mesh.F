@@ -17,11 +17,13 @@ module target_mesh
     contains
 
 
-    integer function target_mesh_setup(mesh) result(stat)
+    integer function target_mesh_setup(mesh, lat2d, lon2d) result(stat)
 
         implicit none
 
         type (target_mesh_type), intent(out) :: mesh
+        real, dimension(:,:), target, optional :: lat2d
+        real, dimension(:,:), target, optional :: lon2d
 
         integer :: i, j
         integer :: iostatus
@@ -32,6 +34,24 @@ module target_mesh
         real, parameter :: pi_const = 2.0 * asin(1.0)
 
         stat = 0
+
+        !
+        ! If 2-d arrays of latitude and longitude are provided, we can just
+        ! point to those arrays rather than generate lat/lon values based on
+        ! a specified target domain
+        !
+        if (present(lat2d) .and. present(lon2d)) then
+
+            mesh % irank = 1
+            mesh % nLat = size(lat2d,2)
+            mesh % nLon = size(lon2d,1)
+            mesh % lats => lat2d
+            mesh % lons => lon2d
+            mesh % valid = .true.
+
+            return
+        end if
+
 
         !
         ! Try to parse nLat, nLon from target_domain file
@@ -141,8 +161,14 @@ module target_mesh
         mesh % startLon = 0.0
         mesh % endLon = 0.0
 
-        if (associated(mesh % lats)) deallocate(mesh % lats)
-        if (associated(mesh % lons)) deallocate(mesh % lons)
+        !
+        ! When irank == 0, we allocated the lats and lons arrays
+        ! internally and should therefore deallocate them
+        !
+        if (mesh % irank == 0) then
+           if (associated(mesh % lats)) deallocate(mesh % lats)
+           if (associated(mesh % lons)) deallocate(mesh % lons)
+        end if
 
     end function target_mesh_free
 
