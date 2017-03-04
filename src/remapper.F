@@ -408,13 +408,13 @@ module remapper
             if (dst_field % ndims == 2) then
                 allocate(dst_field % array2r(dst_field % dimlens(1), &
                                              dst_field % dimlens(2)))
-#if NEAREST_NEIGHBOR
+#ifdef NEAREST_NEIGHBOR
                 do iy=1,size(nearestIndex, dim=2)
                 do ix=1,size(nearestIndex, dim=1)
                     dst_field % array2r(ix,iy) = src_field % array1r(nearestIndex(ix,iy))
                 end do
                 end do
-#endif
+#else
                 do iy=1,size(nearestIndex, dim=2)
                 do ix=1,size(nearestIndex, dim=1)
                     dst_field % array2r(ix,iy) = 0.0
@@ -425,17 +425,18 @@ module remapper
                     end do
                 end do
                 end do
+#endif
             else if (dst_field % ndims == 3) then
                 allocate(dst_field % array3r(dst_field % dimlens(1), &
                                              dst_field % dimlens(2), &
                                              dst_field % dimlens(3)))
-#if NEAREST_NEIGHBOR
+#ifdef NEAREST_NEIGHBOR
                 do iy=1,size(nearestIndex, dim=2)
                 do ix=1,size(nearestIndex, dim=1)
                     dst_field % array3r(:,ix,iy) = src_field % array2r(:,nearestIndex(ix,iy))
                 end do
                 end do
-#endif
+#else
                 do iy=1,size(nearestIndex, dim=2)
                 do ix=1,size(nearestIndex, dim=1)
                     dst_field % array3r(:,ix,iy) = 0.0
@@ -446,18 +447,19 @@ module remapper
                     end do
                 end do
                 end do
+#endif
             else if (dst_field % ndims == 4) then
                 allocate(dst_field % array4r(dst_field % dimlens(1), &
                                              dst_field % dimlens(2), &
                                              dst_field % dimlens(3), &
                                              dst_field % dimlens(4)))
-#if NEAREST_NEIGHBOR
+#ifdef NEAREST_NEIGHBOR
                 do iy=1,size(nearestIndex, dim=2)
                 do ix=1,size(nearestIndex, dim=1)
                     dst_field % array4r(:,:,ix,iy) = src_field % array3r(:,:,nearestIndex(ix,iy))
                 end do
                 end do
-#endif
+#else
                 do iy=1,size(nearestIndex, dim=2)
                 do ix=1,size(nearestIndex, dim=1)
                     dst_field % array4r(:,:,ix,iy) = 0.0
@@ -468,6 +470,7 @@ module remapper
                     end do
                 end do
                 end do
+#endif
             else
                 write(0,*) 'Remap exception: unhandled dimension for real ', dst_field % ndims
             end if
@@ -475,13 +478,13 @@ module remapper
             if (dst_field % ndims == 2) then
                 allocate(dst_field % array2d(dst_field % dimlens(1), &
                                              dst_field % dimlens(2)))
-#if NEAREST_NEIGHBOR
+#ifdef NEAREST_NEIGHBOR
                 do iy=1,size(nearestIndex, dim=2)
                 do ix=1,size(nearestIndex, dim=1)
                     dst_field % array2d(ix,iy) = src_field % array1d(nearestIndex(ix,iy))
                 end do
                 end do
-#endif
+#else
                 do iy=1,size(nearestIndex, dim=2)
                 do ix=1,size(nearestIndex, dim=1)
                     dst_field % array2d(ix,iy) = 0.0
@@ -492,17 +495,18 @@ module remapper
                     end do
                 end do
                 end do
+#endif
             else if (dst_field % ndims == 3) then
                 allocate(dst_field % array3d(dst_field % dimlens(1), &
                                              dst_field % dimlens(2), &
                                              dst_field % dimlens(3)))
-#if NEAREST_NEIGHBOR
+#ifdef NEAREST_NEIGHBOR
                 do iy=1,size(nearestIndex, dim=2)
                 do ix=1,size(nearestIndex, dim=1)
                     dst_field % array3d(:,ix,iy) = src_field % array2d(:,nearestIndex(ix,iy))
                 end do
                 end do
-#endif
+#else
                 do iy=1,size(nearestIndex, dim=2)
                 do ix=1,size(nearestIndex, dim=1)
                     dst_field % array3d(:,ix,iy) = 0.0
@@ -513,18 +517,19 @@ module remapper
                     end do
                 end do
                 end do
+#endif
             else if (dst_field % ndims == 4) then
                 allocate(dst_field % array4d(dst_field % dimlens(1), &
                                              dst_field % dimlens(2), &
                                              dst_field % dimlens(3), &
                                              dst_field % dimlens(4)))
-#if NEAREST_NEIGHBOR
+#ifdef NEAREST_NEIGHBOR
                 do iy=1,size(nearestIndex, dim=2)
                 do ix=1,size(nearestIndex, dim=1)
                     dst_field % array4d(:,:,ix,iy) = src_field % array3d(:,:,nearestIndex(ix,iy))
                 end do
                 end do
-#endif
+#else
                 do iy=1,size(nearestIndex, dim=2)
                 do ix=1,size(nearestIndex, dim=1)
                     dst_field % array4d(:,:,ix,iy) = 0.0
@@ -535,6 +540,7 @@ module remapper
                     end do
                 end do
                 end do
+#endif
             else
                 write(0,*) 'Remap exception: unhandled dimension for dbl ', dst_field % ndims
             end if
