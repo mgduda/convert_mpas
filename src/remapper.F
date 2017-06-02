@@ -440,10 +440,10 @@ module remapper
                 do iy=1,size(nearestIndex, dim=2)
                 do ix=1,size(nearestIndex, dim=1)
                     dst_field % array3r(:,ix,iy) = 0.0
-                    do j=1,3
+                    do j=1,size(sourceNodes, dim=1)
                         dst_field % array3r(:,ix,iy) = dst_field % array3r(:,ix,iy) + &
-                                                        remap_info % cellWeights(j,ix,iy) &
-                                                        * src_field % array2r(:,remap_info % sourceCells(j,ix,iy))
+                                                        nodeWeights(j,ix,iy) &
+                                                        * src_field % array2r(:,sourceNodes(j,ix,iy))
                     end do
                 end do
                 end do
@@ -463,10 +463,10 @@ module remapper
                 do iy=1,size(nearestIndex, dim=2)
                 do ix=1,size(nearestIndex, dim=1)
                     dst_field % array4r(:,:,ix,iy) = 0.0
-                    do j=1,3
+                    do j=1,size(sourceNodes, dim=1)
                         dst_field % array4r(:,:,ix,iy) = dst_field % array4r(:,:,ix,iy) + &
-                                                          remap_info % cellWeights(j,ix,iy) &
-                                                          * src_field % array3r(:,:,remap_info % sourceCells(j,ix,iy))
+                                                          nodeWeights(j,ix,iy) &
+                                                          * src_field % array3r(:,:,sourceNodes(j,ix,iy))
                     end do
                 end do
                 end do
@@ -510,10 +510,10 @@ module remapper
                 do iy=1,size(nearestIndex, dim=2)
                 do ix=1,size(nearestIndex, dim=1)
                     dst_field % array3d(:,ix,iy) = 0.0
-                    do j=1,3
+                    do j=1,size(sourceNodes, dim=1)
                         dst_field % array3d(:,ix,iy) = dst_field % array3d(:,ix,iy) + &
-                                                        remap_info % cellWeights(j,ix,iy) &
-                                                        * src_field % array2d(:,remap_info % sourceCells(j,ix,iy))
+                                                        nodeWeights(j,ix,iy) &
+                                                        * src_field % array2d(:,sourceNodes(j,ix,iy))
                     end do
                 end do
                 end do
@@ -533,10 +533,10 @@ module remapper
                 do iy=1,size(nearestIndex, dim=2)
                 do ix=1,size(nearestIndex, dim=1)
                     dst_field % array4d(:,:,ix,iy) = 0.0
-                    do j=1,3
+                    do j=1,size(sourceNodes, dim=1)
                         dst_field % array4d(:,:,ix,iy) = dst_field % array4d(:,:,ix,iy) + &
-                                                          remap_info % cellWeights(j,ix,iy) &
-                                                          * src_field % array3d(:,:,remap_info % sourceCells(j,ix,iy))
+                                                          nodeWeights(j,ix,iy) &
+                                                          * src_field % array3d(:,:,sourceNodes(j,ix,iy))
                     end do
                 end do
                 end do
