@@ -20,6 +20,8 @@ remapper.o: mpas_mesh.o target_mesh.o scan_input.o
 
 file_output.o: remapper.o scan_input.o
 
+copy_atts.o: scan_input.o file_output.o remapper.o
+
 mpas_mesh.o: scan_input.o
 
 field_list.o: scan_input.o
