@@ -1,5 +1,6 @@
 program convert_mpas
 
+    use copy_atts
     use scan_input
     use mpas_mesh
     use target_mesh
@@ -166,6 +167,7 @@ program convert_mpas
                     should_remap_field(field, include_field_list, exclude_field_list)) then
                     stat = remap_field_dryrun(remap_info, field, target_field)
                     stat = file_output_register_field(output_handle, target_field)
+                    stat = copy_field_atts(handle, field, output_handle, target_field)
                     if (stat /= 0) then
                         stat = free_target_field(target_field)
                         stat = scan_input_free_field(field)
