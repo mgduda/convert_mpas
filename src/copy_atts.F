@@ -61,4 +61,27 @@ module copy_atts
 
     end function copy_field_atts
 
+    ! Add attributes to lat or lon field
+    integer function add_latlon_atts(handle) result(stat)
+
+        implicit none
+
+        type (output_handle_type) :: handle
+
+        integer :: varid
+
+        stat = 0
+
+        stat = NF90_INQ_VARID(handle%ncid, 'latitude', varid)
+        stat = NF90_PUT_ATT(handle % ncid, varid, 'units', 'degree_north')
+        stat = NF90_PUT_ATT(handle % ncid, varid, 'long_name', 'latitude')
+        stat = NF90_PUT_ATT(handle % ncid, varid, 'standard_name', 'latitude')
+
+        stat = NF90_INQ_VARID(handle%ncid, 'longitude', varid)
+        stat = NF90_PUT_ATT(handle % ncid, varid, 'units', 'degree_east')
+        stat = NF90_PUT_ATT(handle % ncid, varid, 'long_name', 'longitude')
+        stat = NF90_PUT_ATT(handle % ncid, varid, 'standard_name', 'longitude')
+
+    end function add_latlon_atts
+
 end module copy_atts

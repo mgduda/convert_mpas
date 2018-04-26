@@ -162,6 +162,7 @@ program convert_mpas
             stat = file_output_register_field(output_handle, target_field)
             stat = free_target_field(target_field)
 
+
             do while (scan_input_next_field(handle, field) == 0) 
                 if (can_remap_field(field) .and. &
                     should_remap_field(field, include_field_list, exclude_field_list)) then
@@ -185,6 +186,7 @@ program convert_mpas
                 stat = scan_input_free_field(field)
             end do
         end if
+        stat = add_latlon_atts(output_handle)
 
 
         ! 
