@@ -186,7 +186,6 @@ program convert_mpas
                 stat = scan_input_free_field(field)
             end do
         end if
-        stat = add_latlon_atts(output_handle)
 
 
         ! 
