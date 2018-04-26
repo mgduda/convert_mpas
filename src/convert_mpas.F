@@ -185,14 +185,10 @@ program convert_mpas
                 end if
                 stat = scan_input_free_field(field)
             end do
-        end if
-        stat = add_latlon_atts(output_handle)
 
-
-        ! 
-        ! Write 'lat' and 'lon' fields for target mesh
-        ! 
-        if (nRecordsOut == 0) then
+            ! 
+            ! Write 'lat' and 'lon' fields for target mesh
+            ! 
             stat = remap_get_target_latitudes(remap_info, target_field)
             stat = file_output_write_field(output_handle, target_field, frame=0)
             stat = free_target_field(target_field)
@@ -200,9 +196,13 @@ program convert_mpas
             stat = remap_get_target_longitudes(remap_info, target_field)
             stat = file_output_write_field(output_handle, target_field, frame=0)
             stat = free_target_field(target_field)
+
+            ! Add units, long_name, standard_name attribute to coordinate variables.
+            stat = add_latlon_atts(output_handle)
+    
         end if
 
-    
+
         !
         ! Loop over all times in the input file
         !
