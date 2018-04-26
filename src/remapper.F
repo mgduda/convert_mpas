@@ -334,9 +334,9 @@ module remapper
         end do
 
         dst_field % dimlens(dst_field % ndims-1) = remap_info % dst_mesh % nlon
-        dst_field % dimnames(dst_field % ndims-1) = 'nLons'
+        dst_field % dimnames(dst_field % ndims-1) = 'longitude'
         dst_field % dimlens(dst_field % ndims) = remap_info % dst_mesh % nlat
-        dst_field % dimnames(dst_field % ndims) = 'nLats'
+        dst_field % dimnames(dst_field % ndims) = 'latitude'
 
     end function remap_field_dryrun
 
@@ -400,9 +400,9 @@ module remapper
             dst_field % dimnames(idim) = src_field % dimnames(idim)
         end do
         dst_field % dimlens(dst_field % ndims-1) = remap_info % dst_mesh % nlon
-        dst_field % dimnames(dst_field % ndims-1) = 'nLons'
+        dst_field % dimnames(dst_field % ndims-1) = 'longitude'
         dst_field % dimlens(dst_field % ndims) = remap_info % dst_mesh % nlat
-        dst_field % dimnames(dst_field % ndims) = 'nLats'
+        dst_field % dimnames(dst_field % ndims) = 'latitude'
 
         if (src_field % xtype == FIELD_TYPE_REAL) then
             if (dst_field % ndims == 2) then
@@ -594,7 +594,7 @@ module remapper
         stat = 0
 
 
-        lat_field % name = 'lat'
+        lat_field % name = 'latitude'
         lat_field % xtype = FIELD_TYPE_REAL
         lat_field % ndims = 1
         lat_field % isTimeDependent = .false.
@@ -602,7 +602,7 @@ module remapper
         allocate(lat_field % dimnames(lat_field % ndims))
         allocate(lat_field % dimlens(lat_field % ndims))
 
-        lat_field % dimnames(1) = 'nLats'
+        lat_field % dimnames(1) = 'latitude'
         lat_field % dimlens(1) = remap_info % dst_mesh % nlat
 
         allocate(lat_field % array1r(lat_field % dimlens(1)))
@@ -623,7 +623,7 @@ module remapper
         stat = 0
 
 
-        lon_field % name = 'lon'
+        lon_field % name = 'longitude'
         lon_field % xtype = FIELD_TYPE_REAL
         lon_field % ndims = 1
         lon_field % isTimeDependent = .false.
@@ -631,7 +631,7 @@ module remapper
         allocate(lon_field % dimnames(lon_field % ndims))
         allocate(lon_field % dimlens(lon_field % ndims))
 
-        lon_field % dimnames(1) = 'nLons'
+        lon_field % dimnames(1) = 'longitude'
         lon_field % dimlens(1) = remap_info % dst_mesh % nlon
 
         allocate(lon_field % array1r(lon_field % dimlens(1)))

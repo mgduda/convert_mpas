@@ -153,7 +153,7 @@ program convert_mpas
         if (nRecordsOut == 0) then
             write(0,*) 'Defining fields in output file'
 
-            ! Define 'lat' and 'lon' fields for target mesh
+            ! Define 'latitude' and 'longitude' fields for target mesh
             stat = remap_get_target_latitudes(remap_info, target_field)
             stat = file_output_register_field(output_handle, target_field)
             stat = free_target_field(target_field)
@@ -190,7 +190,7 @@ program convert_mpas
 
 
         ! 
-        ! Write 'lat' and 'lon' fields for target mesh
+        ! Write 'latitude' and 'longitude' fields for target mesh
         ! 
         if (nRecordsOut == 0) then
             stat = remap_get_target_latitudes(remap_info, target_field)
