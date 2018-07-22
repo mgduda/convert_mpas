@@ -863,9 +863,12 @@ module remapper
         ! output
         real, dimension(nVertices) :: mpas_wachspress_coordinates
 
+        ! parameters
+        integer, parameter :: RHI = selected_real_kind(12)
+
         ! computational intermediates
-        real, dimension(nVertices) :: wach       ! The wachpress area-product
-        real :: wach_total                       ! The wachpress total weight
+        real(kind=RHI), dimension(nVertices) :: wach       ! The wachpress area-product
+        real(kind=RHI) :: wach_total                       ! The wachpress total weight
         integer :: i, j                                       ! Loop indices
         integer :: im1, i0, ip1                               ! im1 = (i-1), i0 = i, ip1 = (i+1)
   
@@ -933,7 +936,7 @@ module remapper
         ! compute lambda
         mpas_wachspress_coordinates= 0.0
         do i = 1, nVertices
-            mpas_wachspress_coordinates(i) = wach(i)/wach_total
+            mpas_wachspress_coordinates(i) = real(wach(i)/wach_total)
         end do
 
     end function mpas_wachspress_coordinates
