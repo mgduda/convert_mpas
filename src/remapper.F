@@ -182,7 +182,7 @@ module remapper
                                              6371229.0)
             end do
             remap_info % vertexWeights(:,ix,iy) = 0.0
-            remap_info % vertexWeights(1:nn,ix,iy) = mpas_wachspress_coordinates(3, vertCoords(:,1:nn), pointInterp)
+            remap_info % vertexWeights(1:nn,ix,iy) = mpas_wachspress_coordinates(nn, vertCoords(:,1:nn), pointInterp)
         end do
         end do
 
@@ -210,7 +210,7 @@ module remapper
                                              6371229.0)
             end do
             remap_info % edgeWeights(:,ix,iy) = 0.0
-            remap_info % edgeWeights(1:nn,ix,iy) = mpas_wachspress_coordinates(3, vertCoords(:,1:nn), pointInterp)
+            remap_info % edgeWeights(1:nn,ix,iy) = mpas_wachspress_coordinates(nn, vertCoords(:,1:nn), pointInterp)
         end do
         end do
 
