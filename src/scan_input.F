@@ -100,10 +100,14 @@ module scan_input
         end if
 
         if (present(nRecords)) then
-            stat = nf90_inquire_dimension(handle % ncid, handle % unlimited_dimid, len=nRecords)
-            if (stat /= NF90_NOERR) then
-                stat = 1
-                return
+            if (handle % unlimited_dimid /= -1) then
+                stat = nf90_inquire_dimension(handle % ncid, handle % unlimited_dimid, len=nRecords)
+                if (stat /= NF90_NOERR) then
+                   stat = 1
+                   return
+                end if
+            else
+                nRecords = 0
             end if
 
             ! In case we have an input file that no time-varying records but
