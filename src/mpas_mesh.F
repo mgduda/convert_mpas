@@ -52,8 +52,6 @@ module mpas_mesh
         end if
 
         mesh % nCells = field % dimlens(1)
-        mesh % nVertices = 2 * (mesh % nCells - 2)
-        mesh % nEdges = 3 * (mesh % nCells - 2)
 
         stat = scan_input_read_field(field)
         allocate(mesh % nEdgesOnCell(mesh % nCells))
@@ -96,6 +94,8 @@ module mpas_mesh
             return
         end if
 
+        mesh % nVertices = field % dimlens(2)
+
         stat = scan_input_read_field(field)
         allocate(mesh % cellsOnVertex(3, mesh % nVertices))
         mesh % cellsOnVertex(:,:) = field % array2i(:,:)
@@ -121,6 +121,8 @@ module mpas_mesh
             stat = 1
             return
         end if
+
+        mesh % nEdges = field % dimlens(2)
 
         stat = scan_input_read_field(field)
         allocate(mesh % cellsOnEdge(2, mesh % nEdges))
