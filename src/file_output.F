@@ -186,6 +186,9 @@ module file_output
                     stat = nf90_def_var(handle % ncid, trim(field % name), NF90_FLOAT, dimids(1:4), varid)
                 end if
             end if
+
+            stat = nf90_put_att(handle % ncid, varid, '_FillValue', NF90_FILL_FLOAT)
+
         else if (field % xtype == FIELD_TYPE_DOUBLE) then
             if (field % ndims == 0) then
                 if (field % isTimeDependent) then
@@ -219,6 +222,8 @@ module file_output
                 end if
             end if
 
+            stat = nf90_put_att(handle % ncid, varid, '_FillValue', NF90_FILL_DOUBLE)
+
         else if (field % xtype == FIELD_TYPE_INTEGER) then
             if (field % ndims == 0) then
                 if (field % isTimeDependent) then
@@ -245,6 +250,8 @@ module file_output
                     stat = nf90_def_var(handle % ncid, trim(field % name), NF90_INT, dimids(1:3), varid)
                 end if
             end if
+
+            stat = nf90_put_att(handle % ncid, varid, '_FillValue', NF90_FILL_INT)
 
         else if (field % xtype == FIELD_TYPE_CHARACTER) then
             write(0,*) ' '
