@@ -1,5 +1,6 @@
 module remapper
 
+    use netcdf, only : NF90_FILL_FLOAT, NF90_FILL_DOUBLE, NF90_FILL_INT
     use mpas_mesh
     use scan_input, only : input_field_type, FIELD_TYPE_REAL, FIELD_TYPE_DOUBLE, FIELD_TYPE_INTEGER
     use target_mesh
@@ -103,6 +104,10 @@ module remapper
                                src_mesh % nCells, src_mesh % maxEdges, &
                                src_mesh % nEdgesOnCell, src_mesh % cellsOnCell, src_mesh % latCell, src_mesh % lonCell)
             remap_info % nearestCell(ix, iy) = idx
+            if (idx <= 0) then
+                remap_info % nearestCell(ix, iy) = 1
+                idx = 1
+            end if
         end do
         end do
 
@@ -115,6 +120,10 @@ module remapper
                                  src_mesh % cellsOnVertex, src_mesh % latCell, src_mesh % lonCell, &
                                  src_mesh % latVertex, src_mesh % lonVertex )
             remap_info % nearestVertex(ix, iy) = idx
+            if (idx <= 0) then
+                remap_info % nearestVertex(ix, iy) = 1
+                idx = 1
+            end if
         end do
         end do
 
@@ -127,6 +136,10 @@ module remapper
                                  src_mesh % cellsOnEdge, src_mesh % latCell, src_mesh % lonCell, &
                                  src_mesh % latEdge, src_mesh % lonEdge )
             remap_info % nearestEdge(ix, iy) = idx
+            if (idx <= 0) then
+                remap_info % nearestEdge(ix, iy) = 1
+                idx = 1
+            end if
         end do
         end do
 
@@ -147,14 +160,20 @@ module remapper
                                  src_mesh % nEdgesOnCell, src_mesh % verticesOnCell, &
                                  src_mesh % cellsOnVertex, src_mesh % latCell, src_mesh % lonCell, &
                                  src_mesh % latVertex, src_mesh % lonVertex )
-            remap_info % sourceCells(:,ix,iy) = src_mesh % cellsOnVertex(:,idx)
-            pointInterp(:) = convert_lx(dst_mesh % lats(index2d(irank,ix),iy), dst_mesh % lons(ix,index2d(irank,iy)), 6371229.0)
-            do j=1,3
-                vertCoords(:,j) = convert_lx(src_mesh % latCell(src_mesh % cellsOnVertex(j,idx)), &
-                                             src_mesh % lonCell(src_mesh % cellsOnVertex(j,idx)), &
-                                             6371229.0)
-            end do
-            remap_info % cellWeights(:,ix,iy) = mpas_wachspress_coordinates(3, vertCoords, pointInterp)
+            if (idx <= 0) then
+                remap_info % sourceCells(:,ix,iy) = 1
+                remap_info % cellWeights(:,ix,iy) = 0.0
+                idx = 1
+            else
+                remap_info % sourceCells(:,ix,iy) = src_mesh % cellsOnVertex(:,idx)
+                pointInterp(:) = convert_lx(dst_mesh % lats(index2d(irank,ix),iy), dst_mesh % lons(ix,index2d(irank,iy)), 6371229.0)
+                do j=1,3
+                    vertCoords(:,j) = convert_lx(src_mesh % latCell(src_mesh % cellsOnVertex(j,idx)), &
+                                                 src_mesh % lonCell(src_mesh % cellsOnVertex(j,idx)), &
+                                                 6371229.0)
+                end do
+                remap_info % cellWeights(:,ix,iy) = mpas_wachspress_coordinates(3, vertCoords, pointInterp)
+            end if
         end do
         end do
 
@@ -172,17 +191,23 @@ module remapper
             idx = nearest_cell(dst_mesh % lats(index2d(irank,ix),iy), dst_mesh % lons(ix,index2d(irank,iy)), idx, &
                                src_mesh % nCells, src_mesh % maxEdges, &
                                src_mesh % nEdgesOnCell, src_mesh % cellsOnCell, src_mesh % latCell, src_mesh % lonCell)
-            nn = src_mesh % nEdgesOnCell(idx)
-            remap_info % sourceVertices(:,ix,iy) = 1
-            remap_info % sourceVertices(1:nn,ix,iy) = src_mesh % verticesOnCell(1:nn,idx)
-            pointInterp(:) = convert_lx(dst_mesh % lats(index2d(irank,ix),iy), dst_mesh % lons(ix,index2d(irank,iy)), 6371229.0)
-            do j=1,nn
-                vertCoords(:,j) = convert_lx(src_mesh % latVertex(src_mesh % verticesOnCell(j,idx)), &
-                                             src_mesh % lonVertex(src_mesh % verticesOnCell(j,idx)), &
-                                             6371229.0)
-            end do
-            remap_info % vertexWeights(:,ix,iy) = 0.0
-            remap_info % vertexWeights(1:nn,ix,iy) = mpas_wachspress_coordinates(nn, vertCoords(:,1:nn), pointInterp)
+            if (idx <= 0) then
+                remap_info % sourceVertices(:,ix,iy) = 1
+                remap_info % vertexWeights(:,ix,iy) = 0.0
+                idx = 1
+            else
+                nn = src_mesh % nEdgesOnCell(idx)
+                remap_info % sourceVertices(:,ix,iy) = 1
+                remap_info % sourceVertices(1:nn,ix,iy) = src_mesh % verticesOnCell(1:nn,idx)
+                pointInterp(:) = convert_lx(dst_mesh % lats(index2d(irank,ix),iy), dst_mesh % lons(ix,index2d(irank,iy)), 6371229.0)
+                do j=1,nn
+                    vertCoords(:,j) = convert_lx(src_mesh % latVertex(src_mesh % verticesOnCell(j,idx)), &
+                                                 src_mesh % lonVertex(src_mesh % verticesOnCell(j,idx)), &
+                                                 6371229.0)
+                end do
+                remap_info % vertexWeights(:,ix,iy) = 0.0
+                remap_info % vertexWeights(1:nn,ix,iy) = mpas_wachspress_coordinates(nn, vertCoords(:,1:nn), pointInterp)
+            end if
         end do
         end do
 
@@ -200,17 +225,23 @@ module remapper
             idx = nearest_cell(dst_mesh % lats(index2d(irank,ix),iy), dst_mesh % lons(ix,index2d(irank,iy)), idx, &
                                src_mesh % nCells, src_mesh % maxEdges, &
                                src_mesh % nEdgesOnCell, src_mesh % cellsOnCell, src_mesh % latCell, src_mesh % lonCell)
-            nn = src_mesh % nEdgesOnCell(idx)
-            remap_info % sourceEdges(:,ix,iy) = 1
-            remap_info % sourceEdges(1:nn,ix,iy) = src_mesh % edgesOnCell(1:nn,idx)
-            pointInterp(:) = convert_lx(dst_mesh % lats(index2d(irank,ix),iy), dst_mesh % lons(ix,index2d(irank,iy)), 6371229.0)
-            do j=1,nn
-                vertCoords(:,j) = convert_lx(src_mesh % latEdge(src_mesh % edgesOnCell(j,idx)), &
-                                             src_mesh % lonEdge(src_mesh % edgesOnCell(j,idx)), &
-                                             6371229.0)
-            end do
-            remap_info % edgeWeights(:,ix,iy) = 0.0
-            remap_info % edgeWeights(1:nn,ix,iy) = mpas_wachspress_coordinates(nn, vertCoords(:,1:nn), pointInterp)
+            if (idx <= 0) then
+                remap_info % sourceEdges(:,ix,iy) = 1
+                remap_info % edgeWeights(:,ix,iy) = 0.0
+                idx = 1
+            else
+                nn = src_mesh % nEdgesOnCell(idx)
+                remap_info % sourceEdges(:,ix,iy) = 1
+                remap_info % sourceEdges(1:nn,ix,iy) = src_mesh % edgesOnCell(1:nn,idx)
+                pointInterp(:) = convert_lx(dst_mesh % lats(index2d(irank,ix),iy), dst_mesh % lons(ix,index2d(irank,iy)), 6371229.0)
+                do j=1,nn
+                    vertCoords(:,j) = convert_lx(src_mesh % latEdge(src_mesh % edgesOnCell(j,idx)), &
+                                                 src_mesh % lonEdge(src_mesh % edgesOnCell(j,idx)), &
+                                                 6371229.0)
+                end do
+                remap_info % edgeWeights(:,ix,iy) = 0.0
+                remap_info % edgeWeights(1:nn,ix,iy) = mpas_wachspress_coordinates(nn, vertCoords(:,1:nn), pointInterp)
+            end if
         end do
         end do
 
@@ -417,12 +448,16 @@ module remapper
 #else
                 do iy=1,size(nearestIndex, dim=2)
                 do ix=1,size(nearestIndex, dim=1)
-                    dst_field % array2r(ix,iy) = 0.0
-                    do j=1,size(sourceNodes, dim=1)
-                        dst_field % array2r(ix,iy) = dst_field % array2r(ix,iy) + &
-                                                      nodeWeights(j,ix,iy) &
-                                                      * src_field % array1r(sourceNodes(j,ix,iy))
-                    end do
+                    if (sum(nodeWeights(:,ix,iy)) == 0.0) then
+                        dst_field % array2r(ix,iy) = NF90_FILL_FLOAT
+                    else
+                        dst_field % array2r(ix,iy) = 0.0
+                        do j=1,size(sourceNodes, dim=1)
+                            dst_field % array2r(ix,iy) = dst_field % array2r(ix,iy) + &
+                                                          nodeWeights(j,ix,iy) &
+                                                          * src_field % array1r(sourceNodes(j,ix,iy))
+                        end do
+                    end if
                 end do
                 end do
 #endif
@@ -439,12 +474,16 @@ module remapper
 #else
                 do iy=1,size(nearestIndex, dim=2)
                 do ix=1,size(nearestIndex, dim=1)
-                    dst_field % array3r(:,ix,iy) = 0.0
-                    do j=1,size(sourceNodes, dim=1)
-                        dst_field % array3r(:,ix,iy) = dst_field % array3r(:,ix,iy) + &
-                                                        nodeWeights(j,ix,iy) &
-                                                        * src_field % array2r(:,sourceNodes(j,ix,iy))
-                    end do
+                    if (sum(nodeWeights(:,ix,iy)) == 0.0) then
+                        dst_field % array3r(:,ix,iy) = NF90_FILL_FLOAT
+                    else
+                        dst_field % array3r(:,ix,iy) = 0.0
+                        do j=1,size(sourceNodes, dim=1)
+                            dst_field % array3r(:,ix,iy) = dst_field % array3r(:,ix,iy) + &
+                                                            nodeWeights(j,ix,iy) &
+                                                            * src_field % array2r(:,sourceNodes(j,ix,iy))
+                        end do
+                    end if
                 end do
                 end do
 #endif
@@ -462,12 +501,16 @@ module remapper
 #else
                 do iy=1,size(nearestIndex, dim=2)
                 do ix=1,size(nearestIndex, dim=1)
-                    dst_field % array4r(:,:,ix,iy) = 0.0
-                    do j=1,size(sourceNodes, dim=1)
-                        dst_field % array4r(:,:,ix,iy) = dst_field % array4r(:,:,ix,iy) + &
-                                                          nodeWeights(j,ix,iy) &
-                                                          * src_field % array3r(:,:,sourceNodes(j,ix,iy))
-                    end do
+                    if (sum(nodeWeights(:,ix,iy)) == 0.0) then
+                        dst_field % array4r(:,:,ix,iy) = NF90_FILL_FLOAT
+                    else
+                        dst_field % array4r(:,:,ix,iy) = 0.0
+                        do j=1,size(sourceNodes, dim=1)
+                            dst_field % array4r(:,:,ix,iy) = dst_field % array4r(:,:,ix,iy) + &
+                                                              nodeWeights(j,ix,iy) &
+                                                              * src_field % array3r(:,:,sourceNodes(j,ix,iy))
+                        end do
+                    end if
                 end do
                 end do
 #endif
@@ -487,12 +530,16 @@ module remapper
 #else
                 do iy=1,size(nearestIndex, dim=2)
                 do ix=1,size(nearestIndex, dim=1)
-                    dst_field % array2d(ix,iy) = 0.0
-                    do j=1,size(sourceNodes, dim=1)
-                        dst_field % array2d(ix,iy) = dst_field % array2d(ix,iy) + &
-                                                      nodeWeights(j,ix,iy) &
-                                                      * src_field % array1d(sourceNodes(j,ix,iy))
-                    end do
+                    if (sum(nodeWeights(:,ix,iy)) == 0.0) then
+                        dst_field % array2d(ix,iy) = NF90_FILL_DOUBLE
+                    else
+                        dst_field % array2d(ix,iy) = 0.0
+                        do j=1,size(sourceNodes, dim=1)
+                            dst_field % array2d(ix,iy) = dst_field % array2d(ix,iy) + &
+                                                          nodeWeights(j,ix,iy) &
+                                                          * src_field % array1d(sourceNodes(j,ix,iy))
+                        end do
+                    end if
                 end do
                 end do
 #endif
@@ -509,12 +556,16 @@ module remapper
 #else
                 do iy=1,size(nearestIndex, dim=2)
                 do ix=1,size(nearestIndex, dim=1)
-                    dst_field % array3d(:,ix,iy) = 0.0
-                    do j=1,size(sourceNodes, dim=1)
-                        dst_field % array3d(:,ix,iy) = dst_field % array3d(:,ix,iy) + &
-                                                        nodeWeights(j,ix,iy) &
-                                                        * src_field % array2d(:,sourceNodes(j,ix,iy))
-                    end do
+                    if (sum(nodeWeights(:,ix,iy)) == 0.0) then
+                        dst_field % array3d(:,ix,iy) = NF90_FILL_DOUBLE
+                    else
+                        dst_field % array3d(:,ix,iy) = 0.0
+                        do j=1,size(sourceNodes, dim=1)
+                            dst_field % array3d(:,ix,iy) = dst_field % array3d(:,ix,iy) + &
+                                                            nodeWeights(j,ix,iy) &
+                                                            * src_field % array2d(:,sourceNodes(j,ix,iy))
+                        end do
+                    end if
                 end do
                 end do
 #endif
@@ -532,12 +583,16 @@ module remapper
 #else
                 do iy=1,size(nearestIndex, dim=2)
                 do ix=1,size(nearestIndex, dim=1)
-                    dst_field % array4d(:,:,ix,iy) = 0.0
-                    do j=1,size(sourceNodes, dim=1)
-                        dst_field % array4d(:,:,ix,iy) = dst_field % array4d(:,:,ix,iy) + &
-                                                          nodeWeights(j,ix,iy) &
-                                                          * src_field % array3d(:,:,sourceNodes(j,ix,iy))
-                    end do
+                    if (sum(nodeWeights(:,ix,iy)) == 0.0) then
+                        dst_field % array4d(:,:,ix,iy) = NF90_FILL_DOUBLE
+                    else
+                        dst_field % array4d(:,:,ix,iy) = 0.0
+                        do j=1,size(sourceNodes, dim=1)
+                            dst_field % array4d(:,:,ix,iy) = dst_field % array4d(:,:,ix,iy) + &
+                                                              nodeWeights(j,ix,iy) &
+                                                              * src_field % array3d(:,:,sourceNodes(j,ix,iy))
+                        end do
+                    end if
                 end do
                 end do
 #endif
@@ -726,12 +781,15 @@ module remapper
             nearest_distance = current_distance
             do i = 1, nEdgesOnCell(current_cell)
                 iCell = cellsOnCell(i,current_cell)
-                if (iCell <= nCells) then
+                if (iCell > 0 .and. iCell <= nCells) then
                     d = sphere_distance(latCell(iCell), lonCell(iCell), target_lat, target_lon, 1.0)
                     if (d < nearest_distance) then
                         nearest_cell = iCell
                         nearest_distance = d
                     end if
+                else
+                    nearest_cell = 0
+                    return
                 end if
             end do
         end do
@@ -775,11 +833,23 @@ module remapper
             nearest_vertex = current_vertex
             nearest_distance = current_distance
             cell1 = cellsOnVertex(1,current_vertex)
+            if (cell1 <= 0) then
+                nearest_vertex = 0
+                return
+            end if
             cell1_dist = sphere_distance(latCell(cell1), lonCell(cell1), target_lat, target_lon, 1.0)
             cell2 = cellsOnVertex(2,current_vertex)
+            if (cell2 <= 0) then
+                nearest_vertex = 0
+                return
+            end if
             cell2_dist = sphere_distance(latCell(cell2), lonCell(cell2), target_lat, target_lon, 1.0)
             if (vertexDegree == 3) then
                cell3 = cellsOnVertex(3,current_vertex)
+               if (cell3 <= 0) then
+                   nearest_vertex = 0
+                   return
+               end if
                cell3_dist = sphere_distance(latCell(cell3), lonCell(cell3), target_lat, target_lon, 1.0)
             end if
             if (vertexDegree == 3) then
