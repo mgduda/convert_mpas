@@ -74,7 +74,7 @@ module remapper
         type (target_mesh_type), intent(in), target :: dst_mesh
         type (remap_info_type), intent(out) :: remap_info
 
-        integer :: idx
+        integer :: idx, last_idx
         integer :: j
         integer :: nn
         integer :: ix, iy
@@ -97,24 +97,25 @@ module remapper
 
         irank = dst_mesh % irank
 
-        idx = 1
+        last_idx = 1
         do iy=1,dst_mesh % nlat
         do ix=1,dst_mesh % nlon
-            idx = nearest_cell(dst_mesh % lats(index2d(irank,ix),iy), dst_mesh % lons(ix,index2d(irank,iy)), idx, &
+            idx = nearest_cell(dst_mesh % lats(index2d(irank,ix),iy), dst_mesh % lons(ix,index2d(irank,iy)), last_idx, &
                                src_mesh % nCells, src_mesh % maxEdges, &
                                src_mesh % nEdgesOnCell, src_mesh % cellsOnCell, src_mesh % latCell, src_mesh % lonCell)
             remap_info % nearestCell(ix, iy) = idx
             if (idx <= 0) then
                 remap_info % nearestCell(ix, iy) = 1
-                idx = 1
+            else
+                last_idx = idx
             end if
         end do
         end do
 
-        idx = 1
+        last_idx = 1
         do iy=1,dst_mesh % nlat
         do ix=1,dst_mesh % nlon
-            idx = nearest_vertex(dst_mesh % lats(index2d(irank,ix),iy), dst_mesh % lons(ix,index2d(irank,iy)), idx, &
+            idx = nearest_vertex(dst_mesh % lats(index2d(irank,ix),iy), dst_mesh % lons(ix,index2d(irank,iy)), last_idx, &
                                  src_mesh % nCells, src_mesh % nVertices, src_mesh % maxEdges, 3, &
                                  src_mesh % nEdgesOnCell, src_mesh % verticesOnCell, &
                                  src_mesh % cellsOnVertex, src_mesh % latCell, src_mesh % lonCell, &
@@ -122,15 +123,16 @@ module remapper
             remap_info % nearestVertex(ix, iy) = idx
             if (idx <= 0) then
                 remap_info % nearestVertex(ix, iy) = 1
-                idx = 1
+            else
+                last_idx = idx
             end if
         end do
         end do
 
-        idx = 1
+        last_idx = 1
         do iy=1,dst_mesh % nlat
         do ix=1,dst_mesh % nlon
-            idx = nearest_vertex(dst_mesh % lats(index2d(irank,ix),iy), dst_mesh % lons(ix,index2d(irank,iy)), idx, &
+            idx = nearest_vertex(dst_mesh % lats(index2d(irank,ix),iy), dst_mesh % lons(ix,index2d(irank,iy)), last_idx, &
                                  src_mesh % nCells, src_mesh % nEdges, src_mesh % maxEdges, 2, &
                                  src_mesh % nEdgesOnCell, src_mesh % edgesOnCell, &
                                  src_mesh % cellsOnEdge, src_mesh % latCell, src_mesh % lonCell, &
@@ -138,7 +140,8 @@ module remapper
             remap_info % nearestEdge(ix, iy) = idx
             if (idx <= 0) then
                 remap_info % nearestEdge(ix, iy) = 1
-                idx = 1
+            else
+                last_idx = idx
             end if
         end do
         end do
@@ -152,10 +155,10 @@ module remapper
         allocate(remap_info % cellWeights(3, dst_mesh % nlon, dst_mesh % nlat))
         allocate(remap_info % sourceCells(3, dst_mesh % nlon, dst_mesh % nlat))
 
-        idx = 1
+        last_idx = 1
         do iy=1,dst_mesh % nlat
         do ix=1,dst_mesh % nlon
-            idx = nearest_vertex(dst_mesh % lats(index2d(irank,ix),iy), dst_mesh % lons(ix,index2d(irank,iy)), idx, &
+            idx = nearest_vertex(dst_mesh % lats(index2d(irank,ix),iy), dst_mesh % lons(ix,index2d(irank,iy)), last_idx, &
                                  src_mesh % nCells, src_mesh % nVertices, src_mesh % maxEdges, 3, &
                                  src_mesh % nEdgesOnCell, src_mesh % verticesOnCell, &
                                  src_mesh % cellsOnVertex, src_mesh % latCell, src_mesh % lonCell, &
@@ -163,7 +166,6 @@ module remapper
             if (idx <= 0) then
                 remap_info % sourceCells(:,ix,iy) = 1
                 remap_info % cellWeights(:,ix,iy) = 0.0
-                idx = 1
             else
                 remap_info % sourceCells(:,ix,iy) = src_mesh % cellsOnVertex(:,idx)
                 pointInterp(:) = convert_lx(dst_mesh % lats(index2d(irank,ix),iy), dst_mesh % lons(ix,index2d(irank,iy)), 6371229.0)
@@ -173,6 +175,7 @@ module remapper
                                                  6371229.0)
                 end do
                 remap_info % cellWeights(:,ix,iy) = mpas_wachspress_coordinates(3, vertCoords, pointInterp)
+                last_idx = idx
             end if
         end do
         end do
@@ -185,10 +188,10 @@ module remapper
         allocate(remap_info % vertexWeights(src_mesh % maxEdges, dst_mesh % nlon, dst_mesh % nlat))
         allocate(remap_info % sourceVertices(src_mesh % maxEdges, dst_mesh % nlon, dst_mesh % nlat))
 
-        idx = 1
+        last_idx = 1
         do iy=1,dst_mesh % nlat
         do ix=1,dst_mesh % nlon
-            idx = nearest_cell(dst_mesh % lats(index2d(irank,ix),iy), dst_mesh % lons(ix,index2d(irank,iy)), idx, &
+            idx = nearest_cell(dst_mesh % lats(index2d(irank,ix),iy), dst_mesh % lons(ix,index2d(irank,iy)), last_idx, &
                                src_mesh % nCells, src_mesh % maxEdges, &
                                src_mesh % nEdgesOnCell, src_mesh % cellsOnCell, src_mesh % latCell, src_mesh % lonCell)
             if (idx <= 0) then
@@ -207,6 +210,7 @@ module remapper
                 end do
                 remap_info % vertexWeights(:,ix,iy) = 0.0
                 remap_info % vertexWeights(1:nn,ix,iy) = mpas_wachspress_coordinates(nn, vertCoords(:,1:nn), pointInterp)
+                last_idx = idx
             end if
         end do
         end do
@@ -219,10 +223,10 @@ module remapper
         allocate(remap_info % edgeWeights(src_mesh % maxEdges, dst_mesh % nlon, dst_mesh % nlat))
         allocate(remap_info % sourceEdges(src_mesh % maxEdges, dst_mesh % nlon, dst_mesh % nlat))
 
-        idx = 1
+        last_idx = 1
         do iy=1,dst_mesh % nlat
         do ix=1,dst_mesh % nlon
-            idx = nearest_cell(dst_mesh % lats(index2d(irank,ix),iy), dst_mesh % lons(ix,index2d(irank,iy)), idx, &
+            idx = nearest_cell(dst_mesh % lats(index2d(irank,ix),iy), dst_mesh % lons(ix,index2d(irank,iy)), last_idx, &
                                src_mesh % nCells, src_mesh % maxEdges, &
                                src_mesh % nEdgesOnCell, src_mesh % cellsOnCell, src_mesh % latCell, src_mesh % lonCell)
             if (idx <= 0) then
@@ -241,6 +245,7 @@ module remapper
                 end do
                 remap_info % edgeWeights(:,ix,iy) = 0.0
                 remap_info % edgeWeights(1:nn,ix,iy) = mpas_wachspress_coordinates(nn, vertCoords(:,1:nn), pointInterp)
+                last_idx = idx
             end if
         end do
         end do
