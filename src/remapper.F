@@ -97,7 +97,7 @@ module remapper
 
         irank = dst_mesh % irank
 
-        last_idx = 1
+        last_idx = interior_element(src_mesh % cellsOnCell, nNeighbors = src_mesh % nEdgesOnCell)
         do iy=1,dst_mesh % nlat
         do ix=1,dst_mesh % nlon
             idx = nearest_cell(dst_mesh % lats(index2d(irank,ix),iy), dst_mesh % lons(ix,index2d(irank,iy)), last_idx, &
@@ -112,7 +112,7 @@ module remapper
         end do
         end do
 
-        last_idx = 1
+        last_idx = interior_element(src_mesh % cellsOnVertex, nNeighborsConstant = 3)
         do iy=1,dst_mesh % nlat
         do ix=1,dst_mesh % nlon
             idx = nearest_vertex(dst_mesh % lats(index2d(irank,ix),iy), dst_mesh % lons(ix,index2d(irank,iy)), last_idx, &
@@ -129,7 +129,7 @@ module remapper
         end do
         end do
 
-        last_idx = 1
+        last_idx = interior_element(src_mesh % cellsOnEdge, nNeighborsConstant = 2)
         do iy=1,dst_mesh % nlat
         do ix=1,dst_mesh % nlon
             idx = nearest_vertex(dst_mesh % lats(index2d(irank,ix),iy), dst_mesh % lons(ix,index2d(irank,iy)), last_idx, &
@@ -155,7 +155,7 @@ module remapper
         allocate(remap_info % cellWeights(3, dst_mesh % nlon, dst_mesh % nlat))
         allocate(remap_info % sourceCells(3, dst_mesh % nlon, dst_mesh % nlat))
 
-        last_idx = 1
+        last_idx = interior_element(src_mesh % cellsOnCell, nNeighbors = src_mesh % nEdgesOnCell)
         do iy=1,dst_mesh % nlat
         do ix=1,dst_mesh % nlon
             idx = nearest_vertex(dst_mesh % lats(index2d(irank,ix),iy), dst_mesh % lons(ix,index2d(irank,iy)), last_idx, &
@@ -189,7 +189,7 @@ module remapper
         allocate(remap_info % vertexWeights(src_mesh % maxEdges, dst_mesh % nlon, dst_mesh % nlat))
         allocate(remap_info % sourceVertices(src_mesh % maxEdges, dst_mesh % nlon, dst_mesh % nlat))
 
-        last_idx = 1
+        last_idx = interior_element(src_mesh % cellsOnVertex, nNeighborsConstant = 3)
         do iy=1,dst_mesh % nlat
         do ix=1,dst_mesh % nlon
             idx = nearest_cell(dst_mesh % lats(index2d(irank,ix),iy), dst_mesh % lons(ix,index2d(irank,iy)), last_idx, &
@@ -224,7 +224,7 @@ module remapper
         allocate(remap_info % edgeWeights(src_mesh % maxEdges, dst_mesh % nlon, dst_mesh % nlat))
         allocate(remap_info % sourceEdges(src_mesh % maxEdges, dst_mesh % nlon, dst_mesh % nlat))
 
-        last_idx = 1
+        last_idx = interior_element(src_mesh % cellsOnEdge, nNeighborsConstant = 2)
         do iy=1,dst_mesh % nlat
         do ix=1,dst_mesh % nlon
             idx = nearest_cell(dst_mesh % lats(index2d(irank,ix),iy), dst_mesh % lons(ix,index2d(irank,iy)), last_idx, &
@@ -1166,5 +1166,85 @@ module remapper
         i = irank * (idx - 1) + 1
 
     end function index2d
+
+
+!-----------------------------------------------------------------------
+!  routine interior_element
+!
+!> \brief Finds a mesh element with no neighors of index 0
+!> \author Michael Duda
+!> \date   10 June 2019
+!> \details
+!>  The objective of this function is to locate an element whose
+!>  neighbors all have non-zero indices; a neighbor index of zero is assumed
+!>  to represent a missing neighbor, and accordingly, elements with only
+!>  non-zero neighbor indices are assumed to be interior to (i.e., not on
+!>  the boundary of) the mesh.
+!>
+!>  Neighbor indices provided in the neighborsOnElement array are assumed
+!>  to be 1-based.
+!>
+!>  If an interior element was found, its index is returned. Otherwise,
+!>  a value of 0 is returned.
+!
+!-----------------------------------------------------------------------
+    integer function interior_element(neighborsOnElement, nNeighbors, nNeighborsConstant)
+
+        implicit none
+
+        integer, dimension(:,:), intent(in) :: neighborsOnElement
+        integer, dimension(:), intent(in), optional :: nNeighbors
+        integer, intent(in), optional :: nNeighborsConstant
+
+        integer :: i, j
+
+        interior_element = 0
+
+        !
+        ! Each element has a variable number of neighbors
+        !
+        if (present(nNeighbors)) then
+
+            ELEMENT_LOOP1: do i=1,size(neighborsOnElement, dim=2)
+
+                ! Scan neighbors of element i
+                do j=1,nNeighbors(i)
+
+                    ! If a zero-index neighbor was found, cycle to the next element
+                    if (neighborsOnElement(j,i) == 0) then
+                        cycle ELEMENT_LOOP1
+                    end if
+                end do
+
+                ! If we reach this point, no zero-index neighbors were found
+                interior_element = i
+                return
+
+            end do ELEMENT_LOOP1
+
+        !
+        ! Each element has a constant number of neighbors
+        !
+        else if (present(nNeighborsConstant)) then
+
+            ELEMENT_LOOP2: do i=1,size(neighborsOnElement, dim=2)
+
+                ! Scan neighbors of element i
+                do j=1,nNeighborsConstant
+
+                    ! If a zero-index neighbor was found, cycle to the next element
+                    if (neighborsOnElement(j,i) == 0) then
+                        cycle ELEMENT_LOOP2
+                    end if
+                end do
+
+                ! If we reach this point, no zero-index neighbors were found
+                interior_element = i
+                return
+
+            end do ELEMENT_LOOP2
+        end if
+
+    end function interior_element
 
 end module remapper
