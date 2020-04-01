@@ -324,6 +324,9 @@ module remapper
             return
         end if
 
+        !
+        ! Is this a stand-alone MPAS output field?
+        !
         decompDim = field % ndims
         if (field % isTimeDependent) then
             decompDim = decompDim - 1
@@ -333,8 +336,17 @@ module remapper
             trim(field % dimnames(decompDim)) /= 'nVertices' .and. &
             trim(field % dimnames(decompDim)) /= 'nEdges') then
 
-            can_remap_field = .false.
-            return
+            !
+            ! If not from stand-alone MPAS, is this a CAM-MPAS output field?
+            !
+            decompDim = 1
+
+            if (trim(field % dimnames(decompDim)) /= 'ncol') then
+
+                can_remap_field = .false.
+                return
+            end if
+
         end if
 
     end function can_remap_field
@@ -349,8 +361,11 @@ module remapper
         type (target_field_type), intent(out) :: dst_field
 
         integer :: idim
+        logical :: CAM_field
 
         stat = 0
+
+        CAM_field = is_CAM_field(src_field % dimnames)
 
         dst_field % name = src_field % name
         dst_field % xtype = src_field % xtype
@@ -365,11 +380,17 @@ module remapper
         allocate(dst_field % dimnames(dst_field % ndims))
         allocate(dst_field % dimlens(dst_field % ndims))
         dst_field % isTimeDependent = src_field % isTimeDependent
-        do idim=1,dst_field % ndims-2
-            dst_field % dimlens(idim) = src_field % dimlens(idim)
-            dst_field % dimnames(idim) = src_field % dimnames(idim)
-        end do
-
+        if (.not. CAM_field) then
+            do idim=1,dst_field % ndims-2
+                dst_field % dimlens(idim) = src_field % dimlens(idim)
+                dst_field % dimnames(idim) = src_field % dimnames(idim)
+            end do
+        else
+            do idim=2,dst_field % ndims-1
+                dst_field % dimlens(idim-1) = src_field % dimlens(idim)
+                dst_field % dimnames(idim-1) = src_field % dimnames(idim)
+            end do
+        end if
         dst_field % dimlens(dst_field % ndims-1) = remap_info % dst_mesh % nlon
         dst_field % dimnames(dst_field % ndims-1) = 'longitude'
         dst_field % dimlens(dst_field % ndims) = remap_info % dst_mesh % nlat
@@ -393,30 +414,46 @@ module remapper
         integer, dimension(:,:), pointer :: nearestIndex
         integer, dimension(:,:,:), pointer :: sourceNodes
         real, dimension(:,:,:), pointer :: nodeWeights
+        logical :: CAM_field = .false.
 
         stat = 0
 
-        decompDim = src_field % ndims
-        if (src_field % isTimeDependent) then
-            decompDim = decompDim - 1
-        end if
+        CAM_field = is_CAM_field(src_field % dimnames)
 
-        if (trim(src_field % dimnames(decompDim)) == 'nCells') then
-            nearestIndex => remap_info % nearestCell
-            sourceNodes => remap_info % sourceCells
-            nodeWeights => remap_info % cellWeights
-        else if (trim(src_field % dimnames(decompDim)) == 'nVertices') then
-            nearestIndex => remap_info % nearestVertex
-            sourceNodes => remap_info % sourceVertices
-            nodeWeights => remap_info % vertexWeights
-        else if (trim(src_field % dimnames(decompDim)) == 'nEdges') then
-            nearestIndex => remap_info % nearestEdge
-            sourceNodes => remap_info % sourceEdges
-            nodeWeights => remap_info % edgeWeights
+        if (.not. CAM_field) then
+            decompDim = src_field % ndims
+            if (src_field % isTimeDependent) then
+                decompDim = decompDim - 1
+            end if
+
+            if (trim(src_field % dimnames(decompDim)) == 'nCells') then
+                nearestIndex => remap_info % nearestCell
+                sourceNodes => remap_info % sourceCells
+                nodeWeights => remap_info % cellWeights
+            else if (trim(src_field % dimnames(decompDim)) == 'nVertices') then
+                nearestIndex => remap_info % nearestVertex
+                sourceNodes => remap_info % sourceVertices
+                nodeWeights => remap_info % vertexWeights
+            else if (trim(src_field % dimnames(decompDim)) == 'nEdges') then
+                nearestIndex => remap_info % nearestEdge
+                sourceNodes => remap_info % sourceEdges
+                nodeWeights => remap_info % edgeWeights
+            else
+                write(0,*) 'Remap exception: unhandled decomposed dim'
+                stat = 1
+                return
+            end if
         else
-            write(0,*) 'Remap exception: unhandled decomposed dim'
-            stat = 1
-            return
+            decompDim = 1
+            if (trim(src_field % dimnames(decompDim)) == 'ncol') then
+                nearestIndex => remap_info % nearestCell
+                sourceNodes => remap_info % sourceCells
+                nodeWeights => remap_info % cellWeights
+            else
+                write(0,*) 'Remap exception: unhandled decomposed dim'
+                stat = 1
+                return
+            end if
         end if
 
         dst_field % name = src_field % name
@@ -432,10 +469,17 @@ module remapper
         allocate(dst_field % dimnames(dst_field % ndims))
         allocate(dst_field % dimlens(dst_field % ndims))
         dst_field % isTimeDependent = src_field % isTimeDependent
-        do idim=1,dst_field % ndims-2
-            dst_field % dimlens(idim) = src_field % dimlens(idim)
-            dst_field % dimnames(idim) = src_field % dimnames(idim)
-        end do
+        if (.not. CAM_field) then
+            do idim=1,dst_field % ndims-2
+                dst_field % dimlens(idim) = src_field % dimlens(idim)
+                dst_field % dimnames(idim) = src_field % dimnames(idim)
+            end do
+        else
+            do idim=2,dst_field % ndims-1
+                dst_field % dimlens(idim-1) = src_field % dimlens(idim)
+                dst_field % dimnames(idim-1) = src_field % dimnames(idim)
+            end do
+        end if
         dst_field % dimlens(dst_field % ndims-1) = remap_info % dst_mesh % nlon
         dst_field % dimnames(dst_field % ndims-1) = 'longitude'
         dst_field % dimlens(dst_field % ndims) = remap_info % dst_mesh % nlat
@@ -486,20 +530,37 @@ module remapper
                 end do
                 end do
 #else
-                do iy=1,size(nearestIndex, dim=2)
-                do ix=1,size(nearestIndex, dim=1)
-                    if (sum(nodeWeights(:,ix,iy)) == 0.0) then
-                        dst_field % array3r(:,ix,iy) = NF90_FILL_FLOAT
-                    else
-                        dst_field % array3r(:,ix,iy) = 0.0
-                        do j=1,size(sourceNodes, dim=1)
-                            dst_field % array3r(:,ix,iy) = dst_field % array3r(:,ix,iy) + &
-                                                            nodeWeights(j,ix,iy) &
-                                                            * src_field % array2r(:,sourceNodes(j,ix,iy))
-                        end do
-                    end if
-                end do
-                end do
+                if (.not. CAM_field) then
+                    do iy=1,size(nearestIndex, dim=2)
+                    do ix=1,size(nearestIndex, dim=1)
+                        if (sum(nodeWeights(:,ix,iy)) == 0.0) then
+                            dst_field % array3r(:,ix,iy) = NF90_FILL_FLOAT
+                        else
+                            dst_field % array3r(:,ix,iy) = 0.0
+                            do j=1,size(sourceNodes, dim=1)
+                                dst_field % array3r(:,ix,iy) = dst_field % array3r(:,ix,iy) + &
+                                                                nodeWeights(j,ix,iy) &
+                                                                * src_field % array2r(:,sourceNodes(j,ix,iy))
+                            end do
+                        end if
+                    end do
+                    end do
+                else
+                    do iy=1,size(nearestIndex, dim=2)
+                    do ix=1,size(nearestIndex, dim=1)
+                        if (sum(nodeWeights(:,ix,iy)) == 0.0) then
+                            dst_field % array3r(:,ix,iy) = NF90_FILL_FLOAT
+                        else
+                            dst_field % array3r(:,ix,iy) = 0.0
+                            do j=1,size(sourceNodes, dim=1)
+                                dst_field % array3r(:,ix,iy) = dst_field % array3r(:,ix,iy) + &
+                                                                nodeWeights(j,ix,iy) &
+                                                                * src_field % array2r(sourceNodes(j,ix,iy),:)
+                            end do
+                        end if
+                    end do
+                    end do
+                end if
 #endif
             else if (dst_field % ndims == 4) then
                 allocate(dst_field % array4r(dst_field % dimlens(1), &
@@ -517,20 +578,37 @@ module remapper
                 end do
                 end do
 #else
-                do iy=1,size(nearestIndex, dim=2)
-                do ix=1,size(nearestIndex, dim=1)
-                    if (sum(nodeWeights(:,ix,iy)) == 0.0) then
-                        dst_field % array4r(:,:,ix,iy) = NF90_FILL_FLOAT
-                    else
-                        dst_field % array4r(:,:,ix,iy) = 0.0
-                        do j=1,size(sourceNodes, dim=1)
-                            dst_field % array4r(:,:,ix,iy) = dst_field % array4r(:,:,ix,iy) + &
-                                                              nodeWeights(j,ix,iy) &
-                                                              * src_field % array3r(:,:,sourceNodes(j,ix,iy))
-                        end do
-                    end if
-                end do
-                end do
+                if (.not. CAM_field) then
+                    do iy=1,size(nearestIndex, dim=2)
+                    do ix=1,size(nearestIndex, dim=1)
+                        if (sum(nodeWeights(:,ix,iy)) == 0.0) then
+                            dst_field % array4r(:,:,ix,iy) = NF90_FILL_FLOAT
+                        else
+                            dst_field % array4r(:,:,ix,iy) = 0.0
+                            do j=1,size(sourceNodes, dim=1)
+                                dst_field % array4r(:,:,ix,iy) = dst_field % array4r(:,:,ix,iy) + &
+                                                                  nodeWeights(j,ix,iy) &
+                                                                  * src_field % array3r(:,:,sourceNodes(j,ix,iy))
+                            end do
+                        end if
+                    end do
+                    end do
+                else
+                    do iy=1,size(nearestIndex, dim=2)
+                    do ix=1,size(nearestIndex, dim=1)
+                        if (sum(nodeWeights(:,ix,iy)) == 0.0) then
+                            dst_field % array4r(:,:,ix,iy) = NF90_FILL_FLOAT
+                        else
+                            dst_field % array4r(:,:,ix,iy) = 0.0
+                            do j=1,size(sourceNodes, dim=1)
+                                dst_field % array4r(:,:,ix,iy) = dst_field % array4r(:,:,ix,iy) + &
+                                                                  nodeWeights(j,ix,iy) &
+                                                                  * src_field % array3r(sourceNodes(j,ix,iy),:,:)
+                            end do
+                        end if
+                    end do
+                    end do
+                end if
 #endif
             else
                 write(0,*) 'Remap exception: unhandled dimension for real ', dst_field % ndims
@@ -580,20 +658,37 @@ module remapper
                 end do
                 end do
 #else
-                do iy=1,size(nearestIndex, dim=2)
-                do ix=1,size(nearestIndex, dim=1)
-                    if (sum(nodeWeights(:,ix,iy)) == 0.0) then
-                        dst_field % array3d(:,ix,iy) = NF90_FILL_DOUBLE
-                    else
-                        dst_field % array3d(:,ix,iy) = 0.0
-                        do j=1,size(sourceNodes, dim=1)
-                            dst_field % array3d(:,ix,iy) = dst_field % array3d(:,ix,iy) + &
-                                                            nodeWeights(j,ix,iy) &
-                                                            * src_field % array2d(:,sourceNodes(j,ix,iy))
-                        end do
-                    end if
-                end do
-                end do
+                if (.not. CAM_field) then
+                    do iy=1,size(nearestIndex, dim=2)
+                    do ix=1,size(nearestIndex, dim=1)
+                        if (sum(nodeWeights(:,ix,iy)) == 0.0) then
+                            dst_field % array3d(:,ix,iy) = NF90_FILL_DOUBLE
+                        else
+                            dst_field % array3d(:,ix,iy) = 0.0
+                            do j=1,size(sourceNodes, dim=1)
+                                dst_field % array3d(:,ix,iy) = dst_field % array3d(:,ix,iy) + &
+                                                                nodeWeights(j,ix,iy) &
+                                                                * src_field % array2d(:,sourceNodes(j,ix,iy))
+                            end do
+                        end if
+                    end do
+                    end do
+                else
+                    do iy=1,size(nearestIndex, dim=2)
+                    do ix=1,size(nearestIndex, dim=1)
+                        if (sum(nodeWeights(:,ix,iy)) == 0.0) then
+                            dst_field % array3d(:,ix,iy) = NF90_FILL_DOUBLE
+                        else
+                            dst_field % array3d(:,ix,iy) = 0.0
+                            do j=1,size(sourceNodes, dim=1)
+                                dst_field % array3d(:,ix,iy) = dst_field % array3d(:,ix,iy) + &
+                                                                nodeWeights(j,ix,iy) &
+                                                                * src_field % array2d(sourceNodes(j,ix,iy),:)
+                            end do
+                        end if
+                    end do
+                    end do
+                end if
 #endif
             else if (dst_field % ndims == 4) then
                 allocate(dst_field % array4d(dst_field % dimlens(1), &
@@ -611,20 +706,37 @@ module remapper
                 end do
                 end do
 #else
-                do iy=1,size(nearestIndex, dim=2)
-                do ix=1,size(nearestIndex, dim=1)
-                    if (sum(nodeWeights(:,ix,iy)) == 0.0) then
-                        dst_field % array4d(:,:,ix,iy) = NF90_FILL_DOUBLE
-                    else
-                        dst_field % array4d(:,:,ix,iy) = 0.0
-                        do j=1,size(sourceNodes, dim=1)
-                            dst_field % array4d(:,:,ix,iy) = dst_field % array4d(:,:,ix,iy) + &
-                                                              nodeWeights(j,ix,iy) &
-                                                              * src_field % array3d(:,:,sourceNodes(j,ix,iy))
-                        end do
-                    end if
-                end do
-                end do
+                if (.not. CAM_field) then
+                    do iy=1,size(nearestIndex, dim=2)
+                    do ix=1,size(nearestIndex, dim=1)
+                        if (sum(nodeWeights(:,ix,iy)) == 0.0) then
+                            dst_field % array4d(:,:,ix,iy) = NF90_FILL_DOUBLE
+                        else
+                            dst_field % array4d(:,:,ix,iy) = 0.0
+                            do j=1,size(sourceNodes, dim=1)
+                                dst_field % array4d(:,:,ix,iy) = dst_field % array4d(:,:,ix,iy) + &
+                                                                  nodeWeights(j,ix,iy) &
+                                                                  * src_field % array3d(:,:,sourceNodes(j,ix,iy))
+                            end do
+                        end if
+                    end do
+                    end do
+                else
+                    do iy=1,size(nearestIndex, dim=2)
+                    do ix=1,size(nearestIndex, dim=1)
+                        if (sum(nodeWeights(:,ix,iy)) == 0.0) then
+                            dst_field % array4d(:,:,ix,iy) = NF90_FILL_DOUBLE
+                        else
+                            dst_field % array4d(:,:,ix,iy) = 0.0
+                            do j=1,size(sourceNodes, dim=1)
+                                dst_field % array4d(:,:,ix,iy) = dst_field % array4d(:,:,ix,iy) + &
+                                                                  nodeWeights(j,ix,iy) &
+                                                                  * src_field % array3d(sourceNodes(j,ix,iy),:,:)
+                            end do
+                        end if
+                    end do
+                    end do
+                end if
 #endif
             else
                 write(0,*) 'Remap exception: unhandled dimension for dbl ', dst_field % ndims
@@ -646,29 +758,53 @@ module remapper
                 allocate(dst_field % array3i(dst_field % dimlens(1), &
                                              dst_field % dimlens(2), &
                                              dst_field % dimlens(3)))
-                do iy=1,size(nearestIndex, dim=2)
-                do ix=1,size(nearestIndex, dim=1)
-                    if (nearestIndex(ix,iy) == 0) then
-                        dst_field % array3i(:,ix,iy) = NF90_FILL_INT
-                    else
-                        dst_field % array3i(:,ix,iy) = src_field % array2i(:,nearestIndex(ix,iy))
-                    end if
-                end do
-                end do
+                if (.not. CAM_field) then
+                    do iy=1,size(nearestIndex, dim=2)
+                    do ix=1,size(nearestIndex, dim=1)
+                        if (nearestIndex(ix,iy) == 0) then
+                            dst_field % array3i(:,ix,iy) = NF90_FILL_INT
+                        else
+                            dst_field % array3i(:,ix,iy) = src_field % array2i(:,nearestIndex(ix,iy))
+                        end if
+                    end do
+                    end do
+                else
+                    do iy=1,size(nearestIndex, dim=2)
+                    do ix=1,size(nearestIndex, dim=1)
+                        if (nearestIndex(ix,iy) == 0) then
+                            dst_field % array3i(:,ix,iy) = NF90_FILL_INT
+                        else
+                            dst_field % array3i(:,ix,iy) = src_field % array2i(nearestIndex(ix,iy),:)
+                        end if
+                    end do
+                    end do
+                end if
             else if (dst_field % ndims == 4) then
                 allocate(dst_field % array4i(dst_field % dimlens(1), &
                                              dst_field % dimlens(2), &
                                              dst_field % dimlens(3), &
                                              dst_field % dimlens(4)))
-                do iy=1,size(nearestIndex, dim=2)
-                do ix=1,size(nearestIndex, dim=1)
-                    if (nearestIndex(ix,iy) == 0) then
-                        dst_field % array4i(:,:,ix,iy) = NF90_FILL_INT
-                    else
-                        dst_field % array4i(:,:,ix,iy) = src_field % array3i(:,:,nearestIndex(ix,iy))
-                    end if
-                end do
-                end do
+                if (.not. CAM_field) then
+                    do iy=1,size(nearestIndex, dim=2)
+                    do ix=1,size(nearestIndex, dim=1)
+                        if (nearestIndex(ix,iy) == 0) then
+                            dst_field % array4i(:,:,ix,iy) = NF90_FILL_INT
+                        else
+                            dst_field % array4i(:,:,ix,iy) = src_field % array3i(:,:,nearestIndex(ix,iy))
+                        end if
+                    end do
+                    end do
+                else
+                    do iy=1,size(nearestIndex, dim=2)
+                    do ix=1,size(nearestIndex, dim=1)
+                        if (nearestIndex(ix,iy) == 0) then
+                            dst_field % array4i(:,:,ix,iy) = NF90_FILL_INT
+                        else
+                            dst_field % array4i(:,:,ix,iy) = src_field % array3i(nearestIndex(ix,iy),:,:)
+                        end if
+                    end do
+                    end do
+                end if
             else
                 write(0,*) 'Remap exception: unhandled dimension for int ', dst_field % ndims
             end if
@@ -1246,5 +1382,25 @@ module remapper
         end if
 
     end function interior_element
+
+
+    logical function is_CAM_field(dimnames)
+
+        implicit none
+
+        character(len=*), dimension(:), intent(in) :: dimnames
+
+        integer :: i
+
+        is_CAM_field = .false.
+
+        do i=1,len(dimnames)
+            if (trim(dimnames(i)) == 'ncol') then
+                is_CAM_field = .true.
+                exit
+            end if
+        end do
+
+    end function is_CAM_field
 
 end module remapper
