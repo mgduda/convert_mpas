@@ -380,21 +380,23 @@ module remapper
         allocate(dst_field % dimnames(dst_field % ndims))
         allocate(dst_field % dimlens(dst_field % ndims))
         dst_field % isTimeDependent = src_field % isTimeDependent
+
+        dst_field % dimlens(1) = remap_info % dst_mesh % nlon
+        dst_field % dimnames(1) = 'longitude'
+        dst_field % dimlens(2) = remap_info % dst_mesh % nlat
+        dst_field % dimnames(2) = 'latitude'
+
         if (.not. CAM_field) then
             do idim=1,dst_field % ndims-2
-                dst_field % dimlens(idim) = src_field % dimlens(idim)
-                dst_field % dimnames(idim) = src_field % dimnames(idim)
+                dst_field % dimlens(2+idim) = src_field % dimlens(idim)
+                dst_field % dimnames(2+idim) = src_field % dimnames(idim)
             end do
         else
             do idim=2,dst_field % ndims-1
-                dst_field % dimlens(idim-1) = src_field % dimlens(idim)
-                dst_field % dimnames(idim-1) = src_field % dimnames(idim)
+                dst_field % dimlens(idim+1) = src_field % dimlens(idim)
+                dst_field % dimnames(idim+1) = src_field % dimnames(idim)
             end do
         end if
-        dst_field % dimlens(dst_field % ndims-1) = remap_info % dst_mesh % nlon
-        dst_field % dimnames(dst_field % ndims-1) = 'longitude'
-        dst_field % dimlens(dst_field % ndims) = remap_info % dst_mesh % nlat
-        dst_field % dimnames(dst_field % ndims) = 'latitude'
 
     end function remap_field_dryrun
 
@@ -469,21 +471,23 @@ module remapper
         allocate(dst_field % dimnames(dst_field % ndims))
         allocate(dst_field % dimlens(dst_field % ndims))
         dst_field % isTimeDependent = src_field % isTimeDependent
+
+        dst_field % dimlens(1) = remap_info % dst_mesh % nlon
+        dst_field % dimnames(1) = 'longitude'
+        dst_field % dimlens(2) = remap_info % dst_mesh % nlat
+        dst_field % dimnames(2) = 'latitude'
+
         if (.not. CAM_field) then
             do idim=1,dst_field % ndims-2
-                dst_field % dimlens(idim) = src_field % dimlens(idim)
-                dst_field % dimnames(idim) = src_field % dimnames(idim)
+                dst_field % dimlens(2+idim) = src_field % dimlens(idim)
+                dst_field % dimnames(2+idim) = src_field % dimnames(idim)
             end do
         else
             do idim=2,dst_field % ndims-1
-                dst_field % dimlens(idim-1) = src_field % dimlens(idim)
-                dst_field % dimnames(idim-1) = src_field % dimnames(idim)
+                dst_field % dimlens(idim+1) = src_field % dimlens(idim)
+                dst_field % dimnames(idim+1) = src_field % dimnames(idim)
             end do
         end if
-        dst_field % dimlens(dst_field % ndims-1) = remap_info % dst_mesh % nlon
-        dst_field % dimnames(dst_field % ndims-1) = 'longitude'
-        dst_field % dimlens(dst_field % ndims) = remap_info % dst_mesh % nlat
-        dst_field % dimnames(dst_field % ndims) = 'latitude'
 
         if (src_field % xtype == FIELD_TYPE_REAL) then
             if (dst_field % ndims == 2) then
@@ -523,9 +527,9 @@ module remapper
                 do iy=1,size(nearestIndex, dim=2)
                 do ix=1,size(nearestIndex, dim=1)
                     if (nearestIndex(ix,iy) == 0) then
-                        dst_field % array3r(:,ix,iy) = NF90_FILL_FLOAT
+                        dst_field % array3r(ix,iy,:) = NF90_FILL_FLOAT
                     else
-                        dst_field % array3r(:,ix,iy) = src_field % array2r(:,nearestIndex(ix,iy))
+                        dst_field % array3r(ix,iy,:) = src_field % array2r(:,nearestIndex(ix,iy))
                     end if
                 end do
                 end do
@@ -534,11 +538,11 @@ module remapper
                     do iy=1,size(nearestIndex, dim=2)
                     do ix=1,size(nearestIndex, dim=1)
                         if (sum(nodeWeights(:,ix,iy)) == 0.0) then
-                            dst_field % array3r(:,ix,iy) = NF90_FILL_FLOAT
+                            dst_field % array3r(ix,iy,:) = NF90_FILL_FLOAT
                         else
-                            dst_field % array3r(:,ix,iy) = 0.0
+                            dst_field % array3r(ix,iy,:) = 0.0
                             do j=1,size(sourceNodes, dim=1)
-                                dst_field % array3r(:,ix,iy) = dst_field % array3r(:,ix,iy) + &
+                                dst_field % array3r(ix,iy,:) = dst_field % array3r(ix,iy,:) + &
                                                                 nodeWeights(j,ix,iy) &
                                                                 * src_field % array2r(:,sourceNodes(j,ix,iy))
                             end do
@@ -549,11 +553,11 @@ module remapper
                     do iy=1,size(nearestIndex, dim=2)
                     do ix=1,size(nearestIndex, dim=1)
                         if (sum(nodeWeights(:,ix,iy)) == 0.0) then
-                            dst_field % array3r(:,ix,iy) = NF90_FILL_FLOAT
+                            dst_field % array3r(ix,iy,:) = NF90_FILL_FLOAT
                         else
-                            dst_field % array3r(:,ix,iy) = 0.0
+                            dst_field % array3r(ix,iy,:) = 0.0
                             do j=1,size(sourceNodes, dim=1)
-                                dst_field % array3r(:,ix,iy) = dst_field % array3r(:,ix,iy) + &
+                                dst_field % array3r(ix,iy,:) = dst_field % array3r(ix,iy,:) + &
                                                                 nodeWeights(j,ix,iy) &
                                                                 * src_field % array2r(sourceNodes(j,ix,iy),:)
                             end do
@@ -571,9 +575,9 @@ module remapper
                 do iy=1,size(nearestIndex, dim=2)
                 do ix=1,size(nearestIndex, dim=1)
                     if (nearestIndex(ix,iy) == 0) then
-                        dst_field % array4r(:,:,ix,iy) = NF90_FILL_FLOAT
+                        dst_field % array4r(ix,iy,:,:) = NF90_FILL_FLOAT
                     else
-                        dst_field % array4r(:,:,ix,iy) = src_field % array3r(:,:,nearestIndex(ix,iy))
+                        dst_field % array4r(ix,iy,:,:) = src_field % array3r(:,:,nearestIndex(ix,iy))
                     end if
                 end do
                 end do
@@ -582,11 +586,11 @@ module remapper
                     do iy=1,size(nearestIndex, dim=2)
                     do ix=1,size(nearestIndex, dim=1)
                         if (sum(nodeWeights(:,ix,iy)) == 0.0) then
-                            dst_field % array4r(:,:,ix,iy) = NF90_FILL_FLOAT
+                            dst_field % array4r(ix,iy,:,:) = NF90_FILL_FLOAT
                         else
-                            dst_field % array4r(:,:,ix,iy) = 0.0
+                            dst_field % array4r(ix,iy,:,:) = 0.0
                             do j=1,size(sourceNodes, dim=1)
-                                dst_field % array4r(:,:,ix,iy) = dst_field % array4r(:,:,ix,iy) + &
+                                dst_field % array4r(ix,iy,:,:) = dst_field % array4r(ix,iy,:,:) + &
                                                                   nodeWeights(j,ix,iy) &
                                                                   * src_field % array3r(:,:,sourceNodes(j,ix,iy))
                             end do
@@ -597,11 +601,11 @@ module remapper
                     do iy=1,size(nearestIndex, dim=2)
                     do ix=1,size(nearestIndex, dim=1)
                         if (sum(nodeWeights(:,ix,iy)) == 0.0) then
-                            dst_field % array4r(:,:,ix,iy) = NF90_FILL_FLOAT
+                            dst_field % array4r(ix,iy,:,:) = NF90_FILL_FLOAT
                         else
-                            dst_field % array4r(:,:,ix,iy) = 0.0
+                            dst_field % array4r(ix,iy,:,:) = 0.0
                             do j=1,size(sourceNodes, dim=1)
-                                dst_field % array4r(:,:,ix,iy) = dst_field % array4r(:,:,ix,iy) + &
+                                dst_field % array4r(ix,iy,:,:) = dst_field % array4r(ix,iy,:,:) + &
                                                                   nodeWeights(j,ix,iy) &
                                                                   * src_field % array3r(sourceNodes(j,ix,iy),:,:)
                             end do
@@ -651,9 +655,9 @@ module remapper
                 do iy=1,size(nearestIndex, dim=2)
                 do ix=1,size(nearestIndex, dim=1)
                     if (nearestIndex(ix,iy) == 0) then
-                        dst_field % array3d(:,ix,iy) = NF90_FILL_DOUBLE
+                        dst_field % array3d(ix,iy,:) = NF90_FILL_DOUBLE
                     else
-                        dst_field % array3d(:,ix,iy) = src_field % array2d(:,nearestIndex(ix,iy))
+                        dst_field % array3d(ix,iy,:) = src_field % array2d(:,nearestIndex(ix,iy))
                     end if
                 end do
                 end do
@@ -662,11 +666,11 @@ module remapper
                     do iy=1,size(nearestIndex, dim=2)
                     do ix=1,size(nearestIndex, dim=1)
                         if (sum(nodeWeights(:,ix,iy)) == 0.0) then
-                            dst_field % array3d(:,ix,iy) = NF90_FILL_DOUBLE
+                            dst_field % array3d(ix,iy,:) = NF90_FILL_DOUBLE
                         else
-                            dst_field % array3d(:,ix,iy) = 0.0
+                            dst_field % array3d(ix,iy,:) = 0.0
                             do j=1,size(sourceNodes, dim=1)
-                                dst_field % array3d(:,ix,iy) = dst_field % array3d(:,ix,iy) + &
+                                dst_field % array3d(ix,iy,:) = dst_field % array3d(ix,iy,:) + &
                                                                 nodeWeights(j,ix,iy) &
                                                                 * src_field % array2d(:,sourceNodes(j,ix,iy))
                             end do
@@ -677,11 +681,11 @@ module remapper
                     do iy=1,size(nearestIndex, dim=2)
                     do ix=1,size(nearestIndex, dim=1)
                         if (sum(nodeWeights(:,ix,iy)) == 0.0) then
-                            dst_field % array3d(:,ix,iy) = NF90_FILL_DOUBLE
+                            dst_field % array3d(ix,iy,:) = NF90_FILL_DOUBLE
                         else
-                            dst_field % array3d(:,ix,iy) = 0.0
+                            dst_field % array3d(ix,iy,:) = 0.0
                             do j=1,size(sourceNodes, dim=1)
-                                dst_field % array3d(:,ix,iy) = dst_field % array3d(:,ix,iy) + &
+                                dst_field % array3d(ix,iy,:) = dst_field % array3d(ix,iy,:) + &
                                                                 nodeWeights(j,ix,iy) &
                                                                 * src_field % array2d(sourceNodes(j,ix,iy),:)
                             end do
@@ -699,9 +703,9 @@ module remapper
                 do iy=1,size(nearestIndex, dim=2)
                 do ix=1,size(nearestIndex, dim=1)
                     if (nearestIndex(ix,iy) == 0) then
-                        dst_field % array4d(:,:,ix,iy) = NF90_FILL_DOUBLE
+                        dst_field % array4d(ix,iy,:,:) = NF90_FILL_DOUBLE
                     else
-                        dst_field % array4d(:,:,ix,iy) = src_field % array3d(:,:,nearestIndex(ix,iy))
+                        dst_field % array4d(ix,iy,:,:) = src_field % array3d(:,:,nearestIndex(ix,iy))
                     end if
                 end do
                 end do
@@ -710,11 +714,11 @@ module remapper
                     do iy=1,size(nearestIndex, dim=2)
                     do ix=1,size(nearestIndex, dim=1)
                         if (sum(nodeWeights(:,ix,iy)) == 0.0) then
-                            dst_field % array4d(:,:,ix,iy) = NF90_FILL_DOUBLE
+                            dst_field % array4d(ix,iy,:,:) = NF90_FILL_DOUBLE
                         else
-                            dst_field % array4d(:,:,ix,iy) = 0.0
+                            dst_field % array4d(ix,iy,:,:) = 0.0
                             do j=1,size(sourceNodes, dim=1)
-                                dst_field % array4d(:,:,ix,iy) = dst_field % array4d(:,:,ix,iy) + &
+                                dst_field % array4d(ix,iy,:,:) = dst_field % array4d(ix,iy,:,:) + &
                                                                   nodeWeights(j,ix,iy) &
                                                                   * src_field % array3d(:,:,sourceNodes(j,ix,iy))
                             end do
@@ -725,11 +729,11 @@ module remapper
                     do iy=1,size(nearestIndex, dim=2)
                     do ix=1,size(nearestIndex, dim=1)
                         if (sum(nodeWeights(:,ix,iy)) == 0.0) then
-                            dst_field % array4d(:,:,ix,iy) = NF90_FILL_DOUBLE
+                            dst_field % array4d(ix,iy,:,:) = NF90_FILL_DOUBLE
                         else
-                            dst_field % array4d(:,:,ix,iy) = 0.0
+                            dst_field % array4d(ix,iy,:,:) = 0.0
                             do j=1,size(sourceNodes, dim=1)
-                                dst_field % array4d(:,:,ix,iy) = dst_field % array4d(:,:,ix,iy) + &
+                                dst_field % array4d(ix,iy,:,:) = dst_field % array4d(ix,iy,:,:) + &
                                                                   nodeWeights(j,ix,iy) &
                                                                   * src_field % array3d(sourceNodes(j,ix,iy),:,:)
                             end do
@@ -762,9 +766,9 @@ module remapper
                     do iy=1,size(nearestIndex, dim=2)
                     do ix=1,size(nearestIndex, dim=1)
                         if (nearestIndex(ix,iy) == 0) then
-                            dst_field % array3i(:,ix,iy) = NF90_FILL_INT
+                            dst_field % array3i(ix,iy,:) = NF90_FILL_INT
                         else
-                            dst_field % array3i(:,ix,iy) = src_field % array2i(:,nearestIndex(ix,iy))
+                            dst_field % array3i(ix,iy,:) = src_field % array2i(:,nearestIndex(ix,iy))
                         end if
                     end do
                     end do
@@ -772,9 +776,9 @@ module remapper
                     do iy=1,size(nearestIndex, dim=2)
                     do ix=1,size(nearestIndex, dim=1)
                         if (nearestIndex(ix,iy) == 0) then
-                            dst_field % array3i(:,ix,iy) = NF90_FILL_INT
+                            dst_field % array3i(ix,iy,:) = NF90_FILL_INT
                         else
-                            dst_field % array3i(:,ix,iy) = src_field % array2i(nearestIndex(ix,iy),:)
+                            dst_field % array3i(ix,iy,:) = src_field % array2i(nearestIndex(ix,iy),:)
                         end if
                     end do
                     end do
@@ -788,9 +792,9 @@ module remapper
                     do iy=1,size(nearestIndex, dim=2)
                     do ix=1,size(nearestIndex, dim=1)
                         if (nearestIndex(ix,iy) == 0) then
-                            dst_field % array4i(:,:,ix,iy) = NF90_FILL_INT
+                            dst_field % array4i(ix,iy,:,:) = NF90_FILL_INT
                         else
-                            dst_field % array4i(:,:,ix,iy) = src_field % array3i(:,:,nearestIndex(ix,iy))
+                            dst_field % array4i(ix,iy,:,:) = src_field % array3i(:,:,nearestIndex(ix,iy))
                         end if
                     end do
                     end do
@@ -798,9 +802,9 @@ module remapper
                     do iy=1,size(nearestIndex, dim=2)
                     do ix=1,size(nearestIndex, dim=1)
                         if (nearestIndex(ix,iy) == 0) then
-                            dst_field % array4i(:,:,ix,iy) = NF90_FILL_INT
+                            dst_field % array4i(ix,iy,:,:) = NF90_FILL_INT
                         else
-                            dst_field % array4i(:,:,ix,iy) = src_field % array3i(nearestIndex(ix,iy),:,:)
+                            dst_field % array4i(ix,iy,:,:) = src_field % array3i(nearestIndex(ix,iy),:,:)
                         end if
                     end do
                     end do
