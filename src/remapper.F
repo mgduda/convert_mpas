@@ -52,6 +52,23 @@ module remapper
         integer, dimension(:,:,:,:), pointer :: array4i => null()
     end type target_field_type
 
+    ! Classes of fields that can be remapped
+    integer, parameter, private :: MPAS_CELL_FIELD   =  1, &  ! 0x01
+                                   MPAS_VTX_FIELD    =  2, &  ! 0x02
+                                   MPAS_EDGE_FIELD   =  4, &  ! 0x04
+                                   CAM_CELL_FIELD    = 16, &  ! 0x10
+                                   CAM_VTX_FIELD     = 32, &  ! 0x20
+                                   CAM_EDGE_FIELD    = 64, &  ! 0x40
+                                   UNSUPPORTED_FIELD = 0
+
+    ! Mask for field class to determine dimension ordering
+    integer, parameter, private :: MPAS_MASK   =   7, &  ! 0x07
+                                   CAM_MASK    = 112     ! 0x70
+
+    ! Mask for field class to determine mesh element type
+    integer, parameter, private :: CELL_MASK   =  17, &  ! 0x11
+                                   VTX_MASK    =  34, &  ! 0x22
+                                   EDGE_MASK   =  68     ! 0x44
 
     private :: nearest_cell, &
                nearest_vertex, &
@@ -306,11 +323,12 @@ module remapper
 
         type (input_field_type), intent(in) :: field
 
-        integer :: decompDim
+        integer :: fld_class
 
 
         can_remap_field = .true.
 
+        ! Check type of field
         if (field % xtype /= FIELD_TYPE_INTEGER .and. &
             field % xtype /= FIELD_TYPE_REAL .and. &
             field % xtype /= FIELD_TYPE_DOUBLE) then
@@ -318,35 +336,19 @@ module remapper
             return
         end if
 
+        ! Check dimensionality of field
         if (field % ndims == 0 .or. &
             (field % ndims == 1 .and. field % isTimeDependent)) then
             can_remap_field = .false.
             return
         end if
 
-        !
-        ! Is this a stand-alone MPAS output field?
-        !
-        decompDim = field % ndims
-        if (field % isTimeDependent) then
-            decompDim = decompDim - 1
-        end if
+        ! Check ordering of dimensions
+        fld_class = field_class(field % dimnames)
 
-        if (trim(field % dimnames(decompDim)) /= 'nCells' .and. &
-            trim(field % dimnames(decompDim)) /= 'nVertices' .and. &
-            trim(field % dimnames(decompDim)) /= 'nEdges') then
-
-            !
-            ! If not from stand-alone MPAS, is this a CAM-MPAS output field?
-            !
-            decompDim = 1
-
-            if (trim(field % dimnames(decompDim)) /= 'ncol') then
-
-                can_remap_field = .false.
-                return
-            end if
-
+        if (iand(fld_class, MPAS_MASK) == 0 .and. iand(fld_class, CAM_MASK) == 0) then
+            can_remap_field = .false.
+            return
         end if
 
     end function can_remap_field
@@ -361,11 +363,11 @@ module remapper
         type (target_field_type), intent(out) :: dst_field
 
         integer :: idim
-        logical :: CAM_field
+        integer :: fld_class
 
         stat = 0
 
-        CAM_field = is_CAM_field(src_field % dimnames)
+        fld_class = field_class(src_field % dimnames)
 
         dst_field % name = src_field % name
         dst_field % xtype = src_field % xtype
@@ -386,16 +388,21 @@ module remapper
         dst_field % dimlens(2) = remap_info % dst_mesh % nlat
         dst_field % dimnames(2) = 'latitude'
 
-        if (.not. CAM_field) then
+        ! Based on ordering of dimensions in source field, set dimension names
+        ! in the destination field
+        if (iand(fld_class, MPAS_MASK) > 0) then
             do idim=1,dst_field % ndims-2
                 dst_field % dimlens(2+idim) = src_field % dimlens(idim)
                 dst_field % dimnames(2+idim) = src_field % dimnames(idim)
             end do
-        else
+        else if (iand(fld_class, CAM_MASK) > 0) then
             do idim=2,dst_field % ndims-1
                 dst_field % dimlens(idim+1) = src_field % dimlens(idim)
                 dst_field % dimnames(idim+1) = src_field % dimnames(idim)
             end do
+        else
+            write(0,*) 'Remap dryrun exception: unhandled field class'
+            stat = 1
         end if
 
     end function remap_field_dryrun
@@ -409,53 +416,35 @@ module remapper
         type (input_field_type), intent(in) :: src_field
         type (target_field_type), intent(out) :: dst_field
 
-        integer :: decompDim
         integer :: idim
         integer :: j
         integer :: iy, ix
         integer, dimension(:,:), pointer :: nearestIndex
         integer, dimension(:,:,:), pointer :: sourceNodes
         real, dimension(:,:,:), pointer :: nodeWeights
-        logical :: CAM_field = .false.
+        integer :: fld_class
 
         stat = 0
 
-        CAM_field = is_CAM_field(src_field % dimnames)
+        fld_class = field_class(src_field % dimnames)
 
-        if (.not. CAM_field) then
-            decompDim = src_field % ndims
-            if (src_field % isTimeDependent) then
-                decompDim = decompDim - 1
-            end if
-
-            if (trim(src_field % dimnames(decompDim)) == 'nCells') then
-                nearestIndex => remap_info % nearestCell
-                sourceNodes => remap_info % sourceCells
-                nodeWeights => remap_info % cellWeights
-            else if (trim(src_field % dimnames(decompDim)) == 'nVertices') then
-                nearestIndex => remap_info % nearestVertex
-                sourceNodes => remap_info % sourceVertices
-                nodeWeights => remap_info % vertexWeights
-            else if (trim(src_field % dimnames(decompDim)) == 'nEdges') then
-                nearestIndex => remap_info % nearestEdge
-                sourceNodes => remap_info % sourceEdges
-                nodeWeights => remap_info % edgeWeights
-            else
-                write(0,*) 'Remap exception: unhandled decomposed dim'
-                stat = 1
-                return
-            end if
+        ! Based on mesh element type, set remapping weight fields
+        if (iand(fld_class, CELL_MASK) > 0) then
+            nearestIndex => remap_info % nearestCell
+            sourceNodes => remap_info % sourceCells
+            nodeWeights => remap_info % cellWeights
+        else if (iand(fld_class, VTX_MASK) > 0) then
+            nearestIndex => remap_info % nearestVertex
+            sourceNodes => remap_info % sourceVertices
+            nodeWeights => remap_info % vertexWeights
+        else if (iand(fld_class, EDGE_MASK) > 0) then
+            nearestIndex => remap_info % nearestEdge
+            sourceNodes => remap_info % sourceEdges
+            nodeWeights => remap_info % edgeWeights
         else
-            decompDim = 1
-            if (trim(src_field % dimnames(decompDim)) == 'ncol') then
-                nearestIndex => remap_info % nearestCell
-                sourceNodes => remap_info % sourceCells
-                nodeWeights => remap_info % cellWeights
-            else
-                write(0,*) 'Remap exception: unhandled decomposed dim'
-                stat = 1
-                return
-            end if
+            write(0,*) 'Remap exception: unhandled decomposed dim'
+            stat = 1
+            return
         end if
 
         dst_field % name = src_field % name
@@ -477,7 +466,9 @@ module remapper
         dst_field % dimlens(2) = remap_info % dst_mesh % nlat
         dst_field % dimnames(2) = 'latitude'
 
-        if (.not. CAM_field) then
+        ! Based on ordering of dimensions in source field, set dimension names
+        ! in the destination field
+        if (iand(fld_class, MPAS_MASK) > 0) then
             do idim=1,dst_field % ndims-2
                 dst_field % dimlens(2+idim) = src_field % dimlens(idim)
                 dst_field % dimnames(2+idim) = src_field % dimnames(idim)
@@ -534,7 +525,7 @@ module remapper
                 end do
                 end do
 #else
-                if (.not. CAM_field) then
+                if (iand(fld_class, MPAS_MASK) > 0) then
                     do iy=1,size(nearestIndex, dim=2)
                     do ix=1,size(nearestIndex, dim=1)
                         if (sum(nodeWeights(:,ix,iy)) == 0.0) then
@@ -582,7 +573,7 @@ module remapper
                 end do
                 end do
 #else
-                if (.not. CAM_field) then
+                if (iand(fld_class, MPAS_MASK) > 0) then
                     do iy=1,size(nearestIndex, dim=2)
                     do ix=1,size(nearestIndex, dim=1)
                         if (sum(nodeWeights(:,ix,iy)) == 0.0) then
@@ -662,7 +653,7 @@ module remapper
                 end do
                 end do
 #else
-                if (.not. CAM_field) then
+                if (iand(fld_class, MPAS_MASK) > 0) then
                     do iy=1,size(nearestIndex, dim=2)
                     do ix=1,size(nearestIndex, dim=1)
                         if (sum(nodeWeights(:,ix,iy)) == 0.0) then
@@ -710,7 +701,7 @@ module remapper
                 end do
                 end do
 #else
-                if (.not. CAM_field) then
+                if (iand(fld_class, MPAS_MASK) > 0) then
                     do iy=1,size(nearestIndex, dim=2)
                     do ix=1,size(nearestIndex, dim=1)
                         if (sum(nodeWeights(:,ix,iy)) == 0.0) then
@@ -762,7 +753,7 @@ module remapper
                 allocate(dst_field % array3i(dst_field % dimlens(1), &
                                              dst_field % dimlens(2), &
                                              dst_field % dimlens(3)))
-                if (.not. CAM_field) then
+                if (iand(fld_class, MPAS_MASK) > 0) then
                     do iy=1,size(nearestIndex, dim=2)
                     do ix=1,size(nearestIndex, dim=1)
                         if (nearestIndex(ix,iy) == 0) then
@@ -788,7 +779,7 @@ module remapper
                                              dst_field % dimlens(2), &
                                              dst_field % dimlens(3), &
                                              dst_field % dimlens(4)))
-                if (.not. CAM_field) then
+                if (iand(fld_class, MPAS_MASK) > 0) then
                     do iy=1,size(nearestIndex, dim=2)
                     do ix=1,size(nearestIndex, dim=1)
                         if (nearestIndex(ix,iy) == 0) then
@@ -1123,7 +1114,7 @@ module remapper
         real(kind=RHI) :: wach_total                       ! The wachpress total weight
         integer :: i, j                                       ! Loop indices
         integer :: im1, i0, ip1                               ! im1 = (i-1), i0 = i, ip1 = (i+1)
-  
+
         ! triangle areas to compute wachspress coordinate
         real, dimension(nVertices) :: areaA
         real, dimension(nVertices) :: areaB
@@ -1140,7 +1131,7 @@ module remapper
                 im1 = mod(nVertices + i - 2, nVertices) + 1
                 i0  = mod(nVertices + i - 1, nVertices) + 1
                 ip1 = mod(nVertices + i    , nVertices) + 1
-   
+
                 ! precompute B_i areas
                 ! always the same because B_i independent of xp,yp,zp
                 ! (COULD CACHE AND USE RESULT FROM ARRAY FOR FURTHER OPTIMIZATION)
@@ -1160,11 +1151,11 @@ module remapper
             im1 = mod(nVertices + i - 2, nVertices) + 1
             i0  = mod(nVertices + i - 1, nVertices) + 1
             ip1 = mod(nVertices + i    , nVertices) + 1
-   
+
             ! compute A_ij areas
             ! must be computed each time
             areaA(i0) = mpas_triangle_signed_area_sphere(pointInterp, vertCoords(:, i0), vertCoords(:, ip1), radiusLocal)
-   
+
             ! precomputed B_i areas, cached
         end do
 
@@ -1215,40 +1206,40 @@ module remapper
         !-----------------------------------------------------------------
         real, dimension(3), intent(in) :: a, b, c  !< Input: 3d (x,y,z) points forming the triangle in which to calculate the bary weights
         real, intent(in) :: radius  !< sphere radius
- 
+
         !-----------------------------------------------------------------
         ! local variables
         !-----------------------------------------------------------------
         real :: ab, bc, ca, semiperim, tanqe
         real, dimension(3) :: ablen, aclen, Dlen
- 
+
         ab = mpas_arc_length(a(1), a(2), a(3), b(1), b(2), b(3))/radius
         bc = mpas_arc_length(b(1), b(2), b(3), c(1), c(2), c(3))/radius
         ca = mpas_arc_length(c(1), c(2), c(3), a(1), a(2), a(3))/radius
         semiperim = 0.5 * (ab + bc + ca)
- 
+
         tanqe = sqrt(max(0.0,tan(0.5 * semiperim) * tan(0.5 * (semiperim - ab)) &
                      * tan(0.5 * (semiperim - bc)) * tan(0.5 * (semiperim - ca))))
- 
+
         mpas_triangle_signed_area_sphere = 4.0 * radius * radius * atan(tanqe)
- 
+
         ! computing correct signs (in similar fashion to mpas_sphere_angle)
         ablen(1) = b(1) - a(1)
         ablen(2) = b(2) - a(2)
         ablen(3) = b(3) - a(3)
- 
+
         aclen(1) = c(1) - a(1)
         aclen(2) = c(2) - a(2)
         aclen(3) = c(3) - a(3)
- 
+
         dlen(1) =   (ablen(2) * aclen(3)) - (ablen(3) * aclen(2))
         dlen(2) = -((ablen(1) * aclen(3)) - (ablen(3) * aclen(1)))
         dlen(3) =   (ablen(1) * aclen(2)) - (ablen(2) * aclen(1))
- 
+
         if ((Dlen(1)*a(1) + Dlen(2)*a(2) + Dlen(3)*a(3)) < 0.0) then
             mpas_triangle_signed_area_sphere = -mpas_triangle_signed_area_sphere
         end if
- 
+
     end function mpas_triangle_signed_area_sphere
 
 
@@ -1260,23 +1251,23 @@ module remapper
     !    same sphere centered at the origin.
     !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
     real function mpas_arc_length(ax, ay, az, bx, by, bz)
- 
+
         implicit none
- 
+
         real, intent(in) :: ax, ay, az, bx, by, bz
- 
+
         real :: r, c
         real :: cx, cy, cz
- 
+
         cx = bx - ax
         cy = by - ay
         cz = bz - az
-  
+
         r = sqrt(ax*ax + ay*ay + az*az)
         c = sqrt(cx*cx + cy*cy + cz*cz)
 
         mpas_arc_length = r * 2.0 * asin(c/(2.0*r))
- 
+
     end function mpas_arc_length
 
 
@@ -1388,23 +1379,94 @@ module remapper
     end function interior_element
 
 
-    logical function is_CAM_field(dimnames)
+!-----------------------------------------------------------------------
+!  routine field_class
+!
+!> \brief Classify a field based on its dimensions
+!> \details
+!>  Given an array of dimension names for a field, return a constant indicating
+!>  whether the dimensions are for a cell-, vertex-,or edge-based field, and
+!>  whether the order of dimensions is consistent with stand-alone MPAS output
+!>  or with CAM-MPAS output.
+!
+!-----------------------------------------------------------------------
+    integer function field_class(dimnames)
 
         implicit none
 
         character(len=*), dimension(:), intent(in) :: dimnames
 
-        integer :: i
+        integer :: decompDim
 
-        is_CAM_field = .false.
 
-        do i=1,len(dimnames)
-            if (trim(dimnames(i)) == 'ncol') then
-                is_CAM_field = .true.
-                exit
-            end if
-        end do
+        field_class = UNSUPPORTED_FIELD
 
-    end function is_CAM_field
+        !
+        ! Begin by checking the names of the right-most dimension
+        !
+        decompDim = size(dimnames)
+
+        ! If this field has no dimensions, remapping is not supported
+        if (decompDim == 0) then
+            return
+        end if
+
+        !
+        ! If right-most dimension is a record dimension, move one
+        ! dimension to the left
+        !
+        if (trim(dimnames(decompDim)) == 'Time') then
+            decompDim = decompDim - 1
+        end if
+
+        ! If the record dimension was the only dimension, this field
+        ! is not supported for remapping
+        if (decompDim <= 0) then
+            return
+        end if
+
+        select case (trim(dimnames(decompDim)))
+
+            case ('nCells')
+                field_class = MPAS_CELL_FIELD
+                return
+
+            case ('nVertices')
+                field_class = MPAS_VTX_FIELD
+                return
+
+            case ('nEdges')
+                field_class = MPAS_EDGE_FIELD
+                return
+
+        end select
+
+        !
+        ! If the right-most dimension did not match any supported
+        ! dimension, try the left-most dimension
+        !
+        decompDim = 1
+
+        select case (trim(dimnames(decompDim)))
+
+            case ('nCells')
+                field_class = CAM_CELL_FIELD
+                return
+
+            case ('ncol')
+                field_class = CAM_CELL_FIELD
+                return
+
+            case ('nVertices')
+                field_class = CAM_VTX_FIELD
+                return
+
+            case ('nEdges')
+                field_class = CAM_EDGE_FIELD
+                return
+
+        end select
+
+    end function field_class
 
 end module remapper
