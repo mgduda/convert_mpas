@@ -1,4 +1,4 @@
-.SUFFIXES: .F .o
+.SUFFIXES: .F90 .o
 
 OBJS = \
 	scan_input.o \
@@ -33,6 +33,6 @@ target_mesh.o:
 clean:
 	rm -f *.mod *.o convert_mpas
 
-.F.o:
+.F90.o:
 	rm -f $@ $*.mod
-	$(FC) $(FFLAGS) -c $*.F $(FCINCLUDES)
+	$(FC) $(FFLAGS) -c $*.F90 $(FCINCLUDES)
