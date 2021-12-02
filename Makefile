@@ -4,7 +4,7 @@ FCINCLUDES = $(shell nc-config --fflags)
 FCLIBS = $(shell nc-config --flibs)
 
 
-CHECKS = config_check
+CHECKS = config_check netcdf_check
 .PHONY: $(CHECKS)
 
 all: $(CHECKS)
@@ -35,5 +35,28 @@ config_check:
 		printf "       the \$$NETCDF environment variable to the NetCDF installation path,\n"; \
 		printf "       adding \$${NETCDF}/bin to your \$$PATH is usually sufficient.\n\n"; \
 		exit 1; \
+	fi
+	@ printf "OK\n"
+
+# Check whether the NetCDF Fortran 90 library interface is available
+netcdf_check: config_check
+	@ printf "Checking for NetCDF Fortran 90 library interface... "
+	@ fname=$$(mktemp varidXXXX.f90); \
+	printf "program foo; use netcdf, only : nf90_open; end program foo\n" >> $$fname; \
+	$(FC) $(FFLAGS) $(FCINCLUDES) $$fname $(FCLIBS) > /dev/null 2>&1; \
+	if [ $$? -ne 0 ]; then \
+		printf "\n\nError: Could not compile a test program using the NetCDF Fortran library.\n"; \
+		printf "       Failed compilation command was:\n\n"; \
+		printf "       $(FC) $(FFLAGS) $(FCINCLUDES) $$fname $(FCLIBS)\n\n"; \
+		printf "       where $$fname contained the following program:\n\n"; \
+		cat $$fname; \
+		printf "\n"; \
+		printf "       Compilation produced the following error:\n\n"; \
+		$(FC) $(FFLAGS) $(FCINCLUDES) $$fname $(FCLIBS) 2>&1; \
+		printf "\n"; \
+		rm $$fname; \
+		exit 1; \
+	else \
+		rm $$fname a.out; \
 	fi
 	@ printf "OK\n"
