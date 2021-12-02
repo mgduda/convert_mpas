@@ -4,7 +4,7 @@ FCINCLUDES = $(shell nc-config --fflags)
 FCLIBS = $(shell nc-config --flibs)
 
 
-CHECKS = config_check netcdf_check
+CHECKS = config_check netcdf_check netcdf4_check
 .PHONY: $(CHECKS)
 
 all: $(CHECKS)
@@ -60,3 +60,19 @@ netcdf_check: config_check
 		rm $$fname a.out; \
 	fi
 	@ printf "OK\n"
+
+# Check whether the NetCDF library supports NetCDF4/HDF5 format
+netcdf4_check: netcdf_check
+	@ printf "Checking for NetCDF4 support... "
+	$(eval FFLAGS_VARID := $(shell $\
+		fname=$$(mktemp varidXXXX.f90); $\
+		printf "program foo; use netcdf, only : nf90_netcdf4; end program foo\n" >> $$fname; $\
+		$(FC) $(FFLAGS) $(FCINCLUDES) -c $$fname > /dev/null 2>&1; $\
+		if [ $$? -eq 0 ]; then $\
+			printf -- "-DHAVE_NETCDF4_SUPPORT"; $\
+			rm $${fname%.f90}.o; $\
+		fi; $\
+		rm $$fname $\
+	))
+	@ printf $(if $(FFLAGS_VARID), "OK (Adding -DHAVE_NETCDF4_SUPPORT to FFLAGS)\n", "Not available\n")
+	$(eval FFLAGS += $(FFLAGS_VARID))

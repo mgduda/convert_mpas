@@ -1,3 +1,9 @@
+#ifdef HAVE_NETCDF4_SUPPORT
+#define FILE_CMODE NF90_NETCDF4
+#else
+#define FILE_CMODE NF90_64BIT_OFFSET
+#endif
+
 module file_output
 
     use netcdf
@@ -41,7 +47,7 @@ module file_output
 
         if ((exists .and. local_mode == FILE_MODE_CLOBBER) .or. (.not. exists)) then
 
-            stat = nf90_create(trim(filename), NF90_NETCDF4, handle % ncid)
+            stat = nf90_create(trim(filename), FILE_CMODE, handle % ncid)
             if (stat /= NF90_NOERR) then
                 stat = 1
                 return
