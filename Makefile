@@ -1,10 +1,10 @@
 FC = $(shell nc-config --fc)
-FFLAGS = -O3 -DHAVE_NF90_INQ_VARIDS
+FFLAGS = -O3
 FCINCLUDES = $(shell nc-config --fflags)
 FCLIBS = $(shell nc-config --flibs)
 
 
-CHECKS = config_check netcdf_check netcdf4_check
+CHECKS = config_check netcdf_check netcdf4_check inq_varids_check
 .PHONY: $(CHECKS)
 
 all: $(CHECKS)
@@ -75,4 +75,20 @@ netcdf4_check: netcdf_check
 		rm $$fname $\
 	))
 	@ printf $(if $(FFLAGS_VARID), "OK (Adding -DHAVE_NETCDF4_SUPPORT to FFLAGS)\n", "Not available\n")
+	$(eval FFLAGS += $(FFLAGS_VARID))
+
+# Check whether the NetCDF library supports nf90_inq_varids
+inq_varids_check: netcdf4_check
+	@ printf "Checking for nf90_inq_varids... "
+	$(eval FFLAGS_VARID := $(shell $\
+		fname=$$(mktemp varidXXXX.f90); $\
+		printf "program foo; use netcdf, only : nf90_inq_varids; end program foo\n" >> $$fname; $\
+		$(FC) $(FFLAGS) $(FCINCLUDES) -c $$fname > /dev/null 2>&1; $\
+		if [ $$? -eq 0 ]; then $\
+			printf -- "-DHAVE_NF90_INQ_VARIDS"; $\
+			rm $${fname%.f90}.o; $\
+		fi; $\
+		rm $$fname $\
+	))
+	@ printf $(if $(FFLAGS_VARID), "OK (Adding -DHAVE_NF90_INQ_VARIDS to FFLAGS)\n", "Not available\n")
 	$(eval FFLAGS += $(FFLAGS_VARID))
