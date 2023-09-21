@@ -1,7 +1,7 @@
-FC = $(shell nc-config --fc)
+FC = $(shell nf-config --fc)
 FFLAGS = -O3
-FCINCLUDES = $(shell nc-config --fflags)
-FCLIBS = $(shell nc-config --flibs)
+FCINCLUDES = $(shell nf-config --fflags)
+FCLIBS = $(shell nf-config --flibs)
 
 
 CHECKS = config_check netcdf_check netcdf4_check inq_varids_check
@@ -24,13 +24,13 @@ clean:
 #-------------------------------------------------------------------------------#
 
 
-# Check that the nc-config program is available
+# Check that the nf-config program is available
 config_check:
-	@ printf "Checking for nc-config... "
-	@ nc-config --fc > /dev/null 2>&1; \
+	@ printf "Checking for nf-config... "
+	@ nf-config --fc > /dev/null 2>&1; \
 	if [ $$? -ne 0 ]; then \
-		printf "\n\nError: nc-config not found in \$$PATH, or it is not working correctly.\n"; \
-		printf "       The nc-config program is typically found in a bin/ sub-directory\n"; \
+		printf "\n\nError: nf-config not found in \$$PATH, or it is not working correctly.\n"; \
+		printf "       The nf-config program is typically found in a bin/ sub-directory\n"; \
 		printf "       of the installation path of the NetCDF library. If you have set\n"; \
 		printf "       the \$$NETCDF environment variable to the NetCDF installation path,\n"; \
 		printf "       adding \$${NETCDF}/bin to your \$$PATH is usually sufficient.\n\n"; \
