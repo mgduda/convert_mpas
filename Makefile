@@ -1,7 +1,9 @@
 FC = $(shell nf-config --fc)
 FFLAGS = -O3
 FCINCLUDES = $(shell nf-config --fflags)
-FCLIBS = $(shell nf-config --flibs)
+RPATH = $(shell nf-config --flibs | grep -o -e '-L\S\+\( \|$$\)' | sed 's/^-L/-Wl,-rpath,/' | tr -d '\n')
+RPATH += $(shell nc-config --libs | grep -o -e '-L\S\+\( \|$$\)' | sed 's/^-L/-Wl,-rpath,/' | tr -d '\n')
+FCLIBS = -L$(shell nc-config --libdir) $(shell nf-config --flibs) $(RPATH)
 
 
 CHECKS = config_check netcdf_check netcdf4_check inq_varids_check
