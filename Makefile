@@ -1,7 +1,7 @@
 FC = $(shell nf-config --fc)
 FFLAGS = -O3
 FCINCLUDES = $(shell nf-config --fflags)
-FCLIBS = $(shell nf-config --flibs)
+FCLIBS = -L$(shell nc-config --libdir) $(shell nf-config --flibs)
 
 
 CHECKS = config_check netcdf_check netcdf4_check inq_varids_check
